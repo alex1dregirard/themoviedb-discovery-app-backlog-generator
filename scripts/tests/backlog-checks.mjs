@@ -55,9 +55,9 @@ test('backlog accepts a growing set of ideas with unique tickets', () => {
   );
 });
 
-test('DATABASE preserves the stable keys of the former EXPL issues', () => {
+test('DASHBOARD preserves the stable keys of the former EXPL issues', () => {
   const epic = configuredBacklog.epics.find(
-    (candidate) => candidate.id === 'DATABASE',
+    (candidate) => candidate.id === 'DASHBOARD',
   );
   assert.ok(epic);
   assert.deepEqual(
@@ -65,19 +65,15 @@ test('DATABASE preserves the stable keys of the former EXPL issues', () => {
     [
       'EXPL-01',
       'EXPL-02',
-      'EXPL-CLI-INIT',
+      'EXPL-GENRES',
       'EXPL-GENRES-CSV',
       'EXPL-COUNTRIES-CSV',
-      'EXPL-DISCOVER-API',
-      ...Array.from(
-        { length: 8 },
-        (_, index) => `EXPL-${String(index + 4).padStart(2, '0')}`,
-      ),
+      'EXPL-COUNTRIES-CSV-IMPORT',
     ],
   );
   for (const ticket of epic.tickets) {
-    assert.ok(ticket.id.startsWith('DATABASE-'));
-    assert.ok(ticket.dependsOn.every((id) => id.startsWith('DATABASE-')));
+    assert.ok(ticket.id.startsWith('DASHBOARD-'));
+    assert.ok(ticket.dependsOn.every((id) => id.startsWith('DASHBOARD-')));
   }
 });
 

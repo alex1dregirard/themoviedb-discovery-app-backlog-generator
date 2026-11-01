@@ -33,60 +33,60 @@ l'évolution historique des notes ou de la popularité : ces valeurs sont celles
 observées à la collecte. Une collecte plafonnée reste un échantillon, pas un
 recensement exhaustif.
 
-| Ticket      | Livraison attendue                                 | Taille | Prérequis                |
-| ----------- | -------------------------------------------------- | ------ | ------------------------ |
-| DATABASE-01 | Spécification fournie des données et relations     | S      | Aucun                    |
-| DATABASE-02 | Mise en place du schéma SQLite spécifié            | M      | DATABASE-01              |
-| DATABASE-03 | Base locale et migrations                          | M      | DATABASE-02              |
-| DATABASE-04 | CLI d'initialisation et chemin configurable        | S      | DATABASE-03              |
-| DATABASE-05 | Import CSV et entretien des genres                 | M      | DATABASE-04              |
-| DATABASE-06 | Import CSV et entretien des pays de production     | M      | DATABASE-05              |
-| DATABASE-07 | Route Discover paginée par année                   | M      | DATABASE-01              |
-| DATABASE-08 | Extraction TMDB par année et pagination            | L      | DATABASE-01, DATABASE-07 |
-| DATABASE-09 | Nettoyage et contrôles de qualité                  | M      | DATABASE-01, DATABASE-08 |
-| DATABASE-10 | Chargement idempotent et suivi des exécutions      | L      | DATABASE-03, DATABASE-09 |
-| DATABASE-11 | CLI de pilotage et simulation                      | M      | DATABASE-04, DATABASE-10 |
-| DATABASE-12 | API de lecture et agrégations                      | L      | DATABASE-10              |
-| DATABASE-13 | Page, filtres et tableau paginé                    | M      | DATABASE-12              |
-| DATABASE-14 | Visualisations et interprétation                   | L      | DATABASE-13              |
-| DATABASE-15 | Démonstration reproductible et tests d'intégration | M      | DATABASE-11, DATABASE-14 |
+| Ticket       | Livraison attendue                                 | Taille | Prérequis                  |
+| ------------ | -------------------------------------------------- | ------ | -------------------------- |
+| DASHBOARD-01 | Spécification fournie des données et relations     | S      | Aucun                      |
+| DASHBOARD-02 | Mise en place du schéma SQLite spécifié            | M      | DASHBOARD-01               |
+| DASHBOARD-03 | Base locale et migrations                          | M      | DASHBOARD-02               |
+| DASHBOARD-04 | CLI d'initialisation et chemin configurable        | S      | DASHBOARD-03               |
+| DASHBOARD-05 | Import CSV et entretien des genres                 | M      | DASHBOARD-04               |
+| DASHBOARD-06 | Import CSV et entretien des pays de production     | M      | DASHBOARD-05               |
+| DASHBOARD-07 | Route Discover paginée par année                   | M      | DASHBOARD-01               |
+| DASHBOARD-08 | Extraction TMDB par année et pagination            | L      | DASHBOARD-01, DASHBOARD-07 |
+| DASHBOARD-09 | Nettoyage et contrôles de qualité                  | M      | DASHBOARD-01, DASHBOARD-08 |
+| DASHBOARD-10 | Chargement idempotent et suivi des exécutions      | L      | DASHBOARD-03, DASHBOARD-09 |
+| DASHBOARD-11 | CLI de pilotage et simulation                      | M      | DASHBOARD-04, DASHBOARD-10 |
+| DASHBOARD-12 | API de lecture et agrégations                      | L      | DASHBOARD-10               |
+| DASHBOARD-13 | Page, filtres et tableau paginé                    | M      | DASHBOARD-12               |
+| DASHBOARD-14 | Visualisations et interprétation                   | L      | DASHBOARD-13               |
+| DASHBOARD-15 | Démonstration reproductible et tests d'intégration | M      | DASHBOARD-11, DASHBOARD-14 |
 
-DATABASE-04, DATABASE-05 et DATABASE-06 spécifient respectivement les apports des PR
+DASHBOARD-04, DASHBOARD-05 et DASHBOARD-06 spécifient respectivement les apports des PR
 [#50](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/50),
 [#51](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/51) et
 [#52](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/52).
 Ces PR contiennent aussi le socle des précédentes : les tickets distinguent
 leurs apports pour éviter de redemander les mêmes développements.
-DATABASE-07 décrit la route Discover de la
+DASHBOARD-07 décrit la route Discover de la
 [#56](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/56) :
 une seule page pour une année de sortie principale, sans collecte automatique,
 enrichissement par le détail ni stockage.
-Les anciens EXPL-04 à EXPL-11 correspondent à DATABASE-08 à DATABASE-15 ; leurs clés stables
+Les anciens EXPL-04 à EXPL-11 correspondent à DASHBOARD-08 à DASHBOARD-15 ; leurs clés stables
 conservent leurs issues et leur suivi. Les nouveaux tickets ont des clés
 distinctes pour ne pas reprendre les anciennes issues portant ces numéros.
 Relancer avec `--update-existing --apply` pour actualiser les titres et les
 dépendances des issues déjà importées.
 
-L'epic EXPL est renommée DATABASE. Les identifiants affichés et les dépendances
-utilisent DATABASE ; les clés stables `EXPL-*` restent inchangées pour retrouver
+L'epic EXPL est renommée DASHBOARD. Les identifiants affichés et les dépendances
+utilisent DASHBOARD ; les clés stables `EXPL-*` restent inchangées pour retrouver
 les mêmes issues et conserver leur historique. Dans un projet existant, renommer
-l'option EXPL du champ Epic en DATABASE avant l'import conserve les rattachements.
+l'option EXPL du champ Epic en DASHBOARD avant l'import conserve les rattachements.
 
-DATABASE-01 décrit le besoin d'exploration, le parcours Discover puis détail d'un film
+DASHBOARD-01 décrit le besoin d'exploration, le parcours Discover puis détail d'un film
 et un dictionnaire des données brutes avec leur provenance dans l'API TMDB.
 Les liens entre films, genres et pays sont expliqués par des règles métier et
 des exemples, sans fournir les entités ni le MCD. Les étudiants en déduisent
-eux-mêmes le MCD dans DATABASE-02, puis le traduisent en schéma SQLite.
+eux-mêmes le MCD dans DASHBOARD-02, puis le traduisent en schéma SQLite.
 Le suivi détaillé des exécutions des étapes suivantes reste une extension distincte.
 
-Dans DATABASE-01, l'année de sortie est une information dérivée de la date de sortie,
+Dans DASHBOARD-01, l'année de sortie est une information dérivée de la date de sortie,
 et non l'année demandée au collecteur. Une date absente ou inexploitable laisse
 l'année inconnue ; le film reste au catalogue mais ne participe pas aux
-regroupements par année. DATABASE-02 choisit de traduire cette règle par une colonne
+regroupements par année. DASHBOARD-02 choisit de traduire cette règle par une colonne
 SQLite générée et stockée, avec les tests du calcul, de sa mise à jour automatique
 et de l'interdiction d'écrire directement cette colonne.
 
-DATABASE-03 et DATABASE-07 peuvent avancer en parallèle après leurs prérequis.
+DASHBOARD-03 et DASHBOARD-07 peuvent avancer en parallèle après leurs prérequis.
 Chaque ticket possède ses critères d'acceptation ; le
 champ Epic du projet associe les tickets à cette évolution, sans créer d'issue
 parent supplémentaire. Ce backlog décrit le travail futur, il n'implémente pas
@@ -259,7 +259,7 @@ même avec `--update-existing`. Omettre ou retirer cette propriété ne détache
 jamais un ticket de sa version. Les erreurs de permission arrêtent l'import.
 
 La configuration fournie crée **1.1.0** et y rattache les trois premiers tickets,
-**DATABASE-01**, **DATABASE-02** et **DATABASE-03**. L'équipe peut ajuster le périmètre des
+**DASHBOARD-01**, **DASHBOARD-02** et **DASHBOARD-03**. L'équipe peut ajuster le périmètre des
 versions suivantes pendant la planification.
 Une milestone regroupe un objectif de livraison, tandis que le statut du projet
 décrit l'avancement des tickets.
@@ -358,8 +358,8 @@ pas GitHub et ne détermine donc pas quelles issues ont changé.
 6. **Rétrospective** : comparer ce qui a été prévu et livré, discuter les
    incertitudes et ajuster le découpage et les estimations du sprint suivant.
 
-Pour une première itération, lire la spécification **DATABASE-01**, puis réaliser le
-schéma **DATABASE-02** et discuter le contrat d'extraction **DATABASE-08**. Construire ensuite un petit
+Pour une première itération, lire la spécification **DASHBOARD-01**, puis réaliser le
+schéma **DASHBOARD-02** et discuter le contrat d'extraction **DASHBOARD-08**. Construire ensuite un petit
 incrément de bout en bout sur une période limitée avant d'élargir la collecte.
 Les tailles restent à réestimer ; découper les tickets L si nécessaire pour
 tenir l'objectif du sprint.

@@ -29,11 +29,11 @@ sizes:
   - name: XL
     color: RED
 epics:
-  - id: DATABASE
+  - id: DASHBOARD
     title: Dashboard des films
     objective: Mettre en place un tableau de bord pour visualiser les films, leurs genres et leurs pays de production.
     tickets:
-      - id: DATABASE-01
+      - id: DASHBOARD-01
         key: EXPL-01
         type: feature
         title: 'Spécifier le modèle de données à utiliser pour le tableau de bord'
@@ -74,18 +74,18 @@ epics:
         milestone: 2.0.0
         dependsOn: []
         acceptance:
-          - Le **M**odèle **C**onceptuel de **D**onnées (**MCD**) est construit et contient les entités et relations nécessaires pour représenter les films, leurs genres et leurs pays de production. L'ensemble des propriétés et contraintes définies dans DATABASE-01 est pris en compte.
-          - Les cardinalités et relations entre les entités reflètent correctement les règles fonctionnelles et les contraintes d'unicité définies dans DATABASE-01.
+          - Le **M**odèle **C**onceptuel de **D**onnées (**MCD**) est construit et contient les entités et relations nécessaires pour représenter les films, leurs genres et leurs pays de production. L'ensemble des propriétés et contraintes définies dans DASHBOARD-01 est pris en compte.
+          - Les cardinalités et relations entre les entités reflètent correctement les règles fonctionnelles et les contraintes d'unicité définies dans DASHBOARD-01.
           - Le schéma relationnel traduit fidèlement le MCD et permet de stocker les films, leurs genres et leurs pays sans doublons.
           - Les contraintes d'intégrité référentielle sont correctement définies pour garantir la cohérence des relations entre les entités.
         definitionOfDone:
           - Le MCD et le schéma relationnel est finalisé et validé.
-      - id: DATABASE-02
+      - id: DASHBOARD-02
         key: EXPL-02
         type: feature
         title: Mettre en place le schéma SQLite à partir de la spécification
         story: |
-          En tant que développeur, je veux traduire la spécification DATABASE-01 en
+          En tant que développeur, je veux traduire la spécification DASHBOARD-01 en
           schéma SQLite pour stocker les films, leurs genres et leurs pays sans doublons.
 
           Un CLI est fourni pour interagir avec la base de données SQLite. Le package `commander` est utilisé pour gérer les options et les commandes du CLI.
@@ -104,16 +104,16 @@ epics:
         size: M
         priority: P1
         milestone: 2.0.0
-        dependsOn: [DATABASE-01]
+        dependsOn: [DASHBOARD-01]
         acceptance:
-          - Le schéma SQLite reflète fidèlement le MCD défini dans DATABASE-01 et permet de stocker les films, leurs genres et leurs pays sans doublons.
+          - Le schéma SQLite reflète fidèlement le MCD défini dans DASHBOARD-01 et permet de stocker les films, leurs genres et leurs pays sans doublons.
           - Le schéma est instancié en typescript grâce à 'node:sqlite' et peut être manipulé via un CLI.
           - Le CLI permet d'exécuter les commandes nécessaires pour créer et gérer la base de données SQLite à partir du schéma défini.
         definitionOfDone:
           - Le schéma est instancié en typescript grâce à 'node:sqlite' et peut être manipulé via un CLI.
           - Le CLI permet d'exécuter les commandes nécessaires pour créer et gérer la base de données SQLite à partir du schéma défini.
           - La base de données peut être initialisée et manipulée via le CLI avec un chemin configurable.
-      - id: DATABASE-03
+      - id: DASHBOARD-03
         key: EXPL-GENRES
         type: feature
         title: Créer et mettre à jour les genres
@@ -122,13 +122,13 @@ epics:
           afin de maintenir une liste de genres cohérente et à jour.
         size: M
         priority: P1
-        dependsOn: [DATABASE-02]
+        dependsOn: [DASHBOARD-02]
         acceptance:
           - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés.
         definitionOfDone:
           - Le module dédié aux genres est implémenté.
           - Des test unitaires couvrent la recherche, l'insertion et la mise à jour des genres.
-      - id: DATABASE-04
+      - id: DASHBOARD-04
         key: EXPL-GENRES-CSV
         type: feature
         title: Importer et mettre à jour les genres à partir d'un fichier CSV
@@ -136,12 +136,12 @@ epics:
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
         size: M
         priority: P1
-        dependsOn: [DATABASE-03]
+        dependsOn: [DASHBOARD-03]
         acceptance:
           - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
         definitionOfDone:
           - Le module dédié aux genres est implémenté pour gérer l'importation depuis un fichier CSV.
-      - id: DATABASE-05
+      - id: DASHBOARD-05
         key: EXPL-COUNTRIES-CSV
         type: feature
         title: Créer et mettre à jour les pays
@@ -150,13 +150,13 @@ epics:
           afin de maintenir une liste de pays cohérente et à jour.
         size: M
         priority: P1
-        dependsOn: [DATABASE-02]
+        dependsOn: [DASHBOARD-02]
         acceptance:
           - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés.
         definitionOfDone:
           - Le module dédié aux pays est implémenté.
           - Des test unitaires couvrent la recherche, l'insertion et la mise à jour des pays.
-      - id: DATABASE-06
+      - id: DASHBOARD-06
         key: EXPL-COUNTRIES-CSV-IMPORT
         type: feature
         title: Importer et mettre à jour les pays à partir d'un fichier CSV
@@ -164,14 +164,13 @@ epics:
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
         size: M
         priority: P1
-        dependsOn: [DATABASE-02]
+        dependsOn: [DASHBOARD-02]
         acceptance:
           - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
         definitionOfDone:
           - Le module dédié aux pays est implémenté pour gérer l'importation depuis un fichier CSV.
-      
-      
-      # - id: DATABASE-04
+
+      # - id: DASHBOARD-04
       #   key: EXPL-COUNTRIES-CSV
       #   type: feature
       #   title: Importer et entretenir les pays de production depuis un fichier CSV
@@ -187,7 +186,7 @@ epics:
       #     pas d'une vérification de son existence dans un catalogue ISO complet.
       #   size: M
       #   priority: P1
-      #   dependsOn: [DATABASE-02, DATABASE-03]
+      #   dependsOn: [DASHBOARD-02, DASHBOARD-03]
       #   acceptance:
       #     - Un module dédié permet de rechercher un pays par code, de lister les pays triés par code et d'insérer ou actualiser leurs noms sans doublon.
       #     - La commande add-countries <csv-file> accepte exactement les colonnes code et name, sans dépendre de leur ordre ni de la casse des en-têtes.
@@ -201,7 +200,7 @@ epics:
       #   definitionOfDone:
       #     - L'import et le nettoyage sont démontrés sur les exemples FR, GB et US en conservant les pays utilisés.
       #     - Les tests de codes invalides, de relance et d'annulation passent ; les exemples et commandes sont documentés et relus.
-      # - id: DATABASE-07
+      # - id: DASHBOARD-07
       #   key: EXPL-DISCOVER-API
       #   type: feature
       #   title: Exposer une page de films TMDB par année via une route Discover
@@ -217,10 +216,10 @@ epics:
       #     une seule page. Elle ne parcourt pas automatiquement toutes les pages,
       #     n'enrichit pas les films par leur détail et ne les écrit pas en base.
       #     La collecte sur une plage d'années et la gestion des limites de requêtes
-      #     restent le périmètre d'DATABASE-08.
+      #     restent le périmètre d'DASHBOARD-08.
       #   size: M
       #   priority: P1
-      #   dependsOn: [DATABASE-01]
+      #   dependsOn: [DASHBOARD-01]
       #   acceptance:
       #     - La route GET /api/discover/movies est enregistrée dans le serveur sans remplacer les routes existantes.
       #     - Le paramètre year est obligatoire, sous forme de chaîne de quatre chiffres entre 1000 et 9999 ; une valeur absente, vide, décimale, hors bornes, une liste ou un objet entraîne HTTP 400 avant tout appel TMDB.
@@ -236,14 +235,14 @@ epics:
       #   definitionOfDone:
       #     - Les tests de la route passent avec TMDB simulé, y compris les réponses vides et les erreurs.
       #     - Un appel paginé est documenté et démontré ; le code est relu et aucun jeton TMDB n'est exposé au client.
-      # - id: DATABASE-08
+      # - id: DASHBOARD-08
       #   key: EXPL-04
       #   type: feature
       #   title: Extraire les films TMDB sur une plage d'années
       #   story: En tant qu'analyste, je veux collecter les films de chaque année demandée sans me limiter aux films populaires de la page d'accueil.
       #   size: L
       #   priority: P1
-      #   dependsOn: [DATABASE-01, DATABASE-07]
+      #   dependsOn: [DASHBOARD-01, DASHBOARD-07]
       #   acceptance:
       #     - L'extraction utilise la recherche de catalogue TMDB par dates de sortie et parcourt la pagination pour chaque année demandée.
       #     - Les bornes d'années sont inclusives ; une date hors période est exclue et les films présents sur plusieurs pages sont dédupliqués par identifiant.
@@ -253,14 +252,14 @@ epics:
       #   definitionOfDone:
       #     - La collecte est démontrée sur plusieurs années avec un bilan indiquant les limites et les éventuelles troncatures.
       #     - Les tests simulés de pagination, de déduplication et de reprise après HTTP 429 passent ; les paramètres sont documentés et relus.
-      # - id: DATABASE-09
+      # - id: DASHBOARD-09
       #   key: EXPL-05
       #   type: feature
       #   title: Nettoyer et contrôler les données collectées
       #   story: En tant qu'analyste, je veux des données validées et un bilan de qualité avant leur chargement.
       #   size: M
       #   priority: P1
-      #   dependsOn: [DATABASE-01, DATABASE-08]
+      #   dependsOn: [DASHBOARD-01, DASHBOARD-08]
       #   acceptance:
       #     - Les types, dates, identifiants, genres et valeurs numériques sont contrôlés selon le dictionnaire.
       #     - Une note sans vote ne contribue pas aux statistiques de notes ; une valeur manquante n'est pas remplacée arbitrairement par zéro.
@@ -269,14 +268,14 @@ epics:
       #   definitionOfDone:
       #     - Les contrôles sont relus et vérifiés sur des jeux valides, incomplets et invalides avec résultats attendus.
       #     - Un bilan de qualité documente les rejets et valeurs inconnues sans exposer le jeton TMDB.
-      # - id: DATABASE-10
+      # - id: DASHBOARD-10
       #   key: EXPL-06
       #   type: feature
       #   title: Charger les données en base de façon idempotente
       #   story: En tant qu'analyste, je veux relancer une alimentation sans doublonner les films ni masquer une collecte incomplète.
       #   size: L
       #   priority: P1
-      #   dependsOn: [DATABASE-02, DATABASE-09]
+      #   dependsOn: [DASHBOARD-02, DASHBOARD-09]
       #   acceptance:
       #     - Le chargement insère les nouveaux films, actualise les existants et synchronise leurs genres avec des transactions cohérentes.
       #     - Deux chargements du même jeu ne modifient pas les effectifs des films et associations.
@@ -286,14 +285,14 @@ epics:
       #   definitionOfDone:
       #     - Deux chargements du même jeu démontrent l'absence de doublons et la mise à jour cohérente des relations.
       #     - Les tests de transaction et de suivi des exécutions passent ; les règles de reprise sont documentées et le code est relu.
-      # - id: DATABASE-11
+      # - id: DASHBOARD-11
       #   key: EXPL-07
       #   type: feature
       #   title: Piloter l'alimentation avec un petit CLI
       #   story: En tant qu'étudiant, je veux lancer le pipeline depuis le terminal en choisissant les années sans modifier son code.
       #   size: M
       #   priority: P1
-      #   dependsOn: [DATABASE-04, DATABASE-10]
+      #   dependsOn: [DASHBOARD-04, DASHBOARD-10]
       #   acceptance:
       #     - Une commande npm expose une aide et des options de début, fin et limite par année avec un exemple pour 2015 à 2024.
       #     - Le CLI appelle le pipeline partagé d'extraction, validation et chargement sans dupliquer sa logique.
@@ -303,14 +302,14 @@ epics:
       #   definitionOfDone:
       #     - Les commandes de simulation et de collecte sont documentées et démontrées avec leurs paramètres.
       #     - Les tests du CLI passent, y compris les erreurs explicites et la simulation sans écriture ; le code est relu.
-      # - id: DATABASE-12
+      # - id: DASHBOARD-12
       #   key: EXPL-08
       #   type: feature
       #   title: Exposer les données et indicateurs d'exploration dans l'API
       #   story: En tant que visiteur, je veux explorer les données stockées sans déclencher de nouvelle collecte TMDB.
       #   size: L
       #   priority: P2
-      #   dependsOn: [DATABASE-10]
+      #   dependsOn: [DASHBOARD-10]
       #   acceptance:
       #     - Des routes documentées lisent uniquement la base et acceptent période inclusive, genre et pagination valides.
       #     - L'API fournit liste de films et agrégats par année avec effectif, nombre de films notés, moyenne et médiane des notes valides.
@@ -321,14 +320,14 @@ epics:
       #   definitionOfDone:
       #     - Les réponses et agrégations sont vérifiées sur un jeu connu, incluant les années sans données.
       #     - Les tests de l'API passent ; les paramètres, formats et erreurs sont documentés et le code est relu.
-      # - id: DATABASE-13
+      # - id: DASHBOARD-13
       #   key: EXPL-09
       #   type: feature
       #   title: Créer la page d'exploration et ses filtres
       #   story: En tant que visiteur, je veux choisir une plage d'années et un genre puis consulter les films correspondants.
       #   size: M
       #   priority: P2
-      #   dependsOn: [DATABASE-12]
+      #   dependsOn: [DASHBOARD-12]
       #   acceptance:
       #     - Une page Tableau de bord est accessible depuis la navigation sans modifier la liste existante des films populaires.
       #     - Les années de début et fin et le genre sont conservés dans l'URL et restaurés au rechargement.
@@ -338,14 +337,14 @@ epics:
       #   definitionOfDone:
       #     - Le parcours de filtrage et de pagination est démontré, avec les états de chargement, vide et erreur.
       #     - Les tests de la page passent ; les contrôles sont utilisables au clavier et le code est relu.
-      # - id: DATABASE-14
+      # - id: DASHBOARD-14
       #   key: EXPL-10
       #   type: feature
       #   title: Visualiser et comparer les années du catalogue
       #   story: En tant qu'analyste, je veux comparer distributions et indicateurs entre années sans confondre absence de données et valeur nulle.
       #   size: L
       #   priority: P2
-      #   dependsOn: [DATABASE-13]
+      #   dependsOn: [DASHBOARD-13]
       #   acceptance:
       #     - La page affiché effectif et moyenne ou médiane des notes ainsi que des graphiques de répartition par année et par genre pour les filtres actifs.
       #     - Les titres, axes, unités, effectifs et règles de calcul sont visibles ; une alternative tabulaire restitue les valeurs.
@@ -355,14 +354,14 @@ epics:
       #   definitionOfDone:
       #     - Les graphiques sont vérifiés contre les agrégations d'un jeu connu et réagissent aux filtres.
       #     - Les unités et limites d'interprétation sont affichées ; les tests passent et les visualisations sont relues.
-      # - id: DATABASE-15
+      # - id: DASHBOARD-15
       #   key: EXPL-11
       #   type: feature
       #   title: Livrer un parcours reproductible de la base au tableau de bord
       #   story: En tant qu'étudiant ou enseignant, je veux démontrer le parcours complet sans dépendance à un jeton TMDB réel.
       #   size: M
       #   priority: P2
-      #   dependsOn: [DATABASE-11, DATABASE-14]
+      #   dependsOn: [DASHBOARD-11, DASHBOARD-14]
       #   acceptance:
       #     - Un petit jeu synthétique documenté couvre plusieurs années, plusieurs genres, une valeur manquante et une année sans données.
       #     - Une procédure depuis un clone explique installation, initialisation, alimentation de démonstration, lancement et consultation du tableau de bord.
