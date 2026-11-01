@@ -1,0 +1,30 @@
+{
+  "name": "themoviedb-discovery-app-backlog-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reusable YAML-driven GitHub Projects backlog for TMDB student projects",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/but-sd/themoviedb-discovery-app-backlog-generator.git"
+  },
+  "type": "module",
+  "scripts": {
+    "backlog:instantiate": "node scripts/instantiate-backlog.mjs",
+    "backlog:test": "node --test scripts/tests/backlog-checks.mjs",
+    "test": "npm run backlog:test",
+    "lint": "oxlint scripts",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
