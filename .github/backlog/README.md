@@ -148,16 +148,17 @@ Avec un autre type de jeton, vérifier les droits correspondants ; les règles
 d'une organisation peuvent restreindre la création de projets. Ne jamais écrire
 un jeton dans la configuration.
 
-Depuis la racine de la copie du projet, remplacer `MON_LOGIN` et `MON_DEPOT` :
-dans `--repo`, utiliser le login personnel ou le nom de l'organisation comme
-propriétaire du dépôt ; `--owner MON_LOGIN` reste le propriétaire du GitHub Project.
+Depuis la racine de la copie du projet, remplacer `MON_LOGIN` et `MON_DEPOT`.
+Le dépôt cible et le GitHub Project doivent appartenir au même propriétaire :
+`--owner` indique ce propriétaire et `--repo` accepte uniquement le nom du
+dépôt, sans préfixe propriétaire.
 
 ```sh
 # Vérifier les tickets localement : aucune requête GitHub, aucune écriture.
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --dry-run
 
 # Créer réellement un projet et les issues dans le dépôt indiqué explicitement.
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --apply
 ```
 
 Le script crée un GitHub Project lié au dépôt, les issues et les champs :
@@ -190,7 +191,7 @@ La création affiche immédiatement l'URL et le numéro du projet, ainsi que la
 commande de reprise. Conserver ce numéro :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --project-number 7 --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --apply
 ```
 
 **Sans `--project-number`, chaque lancement avec `--apply` crée un nouveau
@@ -254,8 +255,8 @@ Après récupération de la nouvelle configuration, chaque étudiant relance ver
 **le même numéro de projet** :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --project-number 7 --dry-run
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --project-number 7 --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --apply
 ```
 
 La simulation reste locale : elle affiche le backlog configuré, pas la différence
@@ -278,8 +279,8 @@ Pour répercuter les changements de titres, user stories, critères d'acceptatio
 objectifs pédagogiques ou dépendances, ajouter `--update-existing` :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --project-number 7 --update-existing --dry-run
-npm run backlog:instantiate -- --repo MON_ORGANISATION/MON_DEPOT --owner MON_LOGIN --project-number 7 --update-existing --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --update-existing --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --update-existing --apply
 ```
 
 **Cette option remplace le titre et toute la description de chaque issue dont le

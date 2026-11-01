@@ -327,19 +327,18 @@ test('renumbering keeps existing issue identity and dependencies across reruns',
 });
 
 test('target is explicit and writes require --apply', () => {
-  const options = parseOptions([
-    '--repo',
-    'student/movies',
-    '--owner',
-    'student',
-  ]);
+  const options = parseOptions(['--repo', 'movies', '--owner', 'student']);
   assert.equal(options.apply, false);
+  assert.throws(
+    () => parseOptions(['--repo', 'org/movies', '--owner', 'student']),
+    /sans proprietaire/,
+  );
   assert.throws(() => parseOptions([]), /--repo/);
   assert.throws(
     () =>
       parseOptions([
         '--repo',
-        'student/movies',
+        'movies',
         '--owner',
         'student',
         '--project-number',
@@ -994,7 +993,7 @@ test('update simulation makes no GitHub calls and warns about manual edits', () 
   const output = [];
   const options = parseOptions([
     '--repo',
-    'student/movies',
+    'movies',
     '--owner',
     'student',
     '--update-existing',
