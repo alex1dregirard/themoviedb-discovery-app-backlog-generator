@@ -329,6 +329,10 @@ test('renumbering keeps existing issue identity and dependencies across reruns',
 test('target is explicit and writes require --apply', () => {
   const options = parseOptions(['--repo', 'movies', '--owner', 'student']);
   assert.equal(options.apply, false);
+  const defaultOwner = parseOptions(['--repo', 'movies']);
+  assert.equal(defaultOwner.repo, 'movies');
+  assert.equal(defaultOwner.owner, undefined);
+  assert.equal(defaultOwner.apply, false);
   assert.throws(
     () => parseOptions(['--repo', 'org/movies', '--owner', 'student']),
     /sans proprietaire/,
@@ -347,6 +351,30 @@ test('target is explicit and writes require --apply', () => {
     /entier/,
   );
   assert.throws(() => parseOptions(['--apply', '--dry-run']), /combiner/);
+});
+
+test('authenticated user is the default owner when --owner is omitted', () => {
+  const f = fixture();
+  const options = parseOptions(['--repo', 'movies', '--apply']);
+  const calls = [];
+  const run = (args, input) => {
+    calls.push(args);
+    if (args[0] === 'api' && args[1] === 'user')
+      return JSON.stringify({ login: 'student' });
+    return f.run(args, input);
+  };
+  instantiate(f.small, options, run, () => {});
+  assert.ok(
+    calls.some((args) => args[0] === 'repo' && args[2] === 'student/movies'),
+  );
+  assert.ok(
+    calls.some(
+      (args) =>
+        args[0] === 'project' &&
+        args.includes('--owner') &&
+        args.includes('student'),
+    ),
+  );
 });
 
 test('simulation performs no GitHub calls and displays every ticket in Backlog', () => {
@@ -432,6 +460,8 @@ function fixture({
     calls.push({ args, input });
     const command = args.slice(0, 2).join(' ');
     if (command === 'auth status' || command === 'project link') return '';
+    if (args[0] === 'api' && args[1] === 'user')
+      return JSON.stringify({ login: 'student' });
     if (command === 'repo view')
       return JSON.stringify({
         hasIssuesEnabled: true,

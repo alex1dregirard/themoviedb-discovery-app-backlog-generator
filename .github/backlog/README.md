@@ -148,10 +148,12 @@ Avec un autre type de jeton, vérifier les droits correspondants ; les règles
 d'une organisation peuvent restreindre la création de projets. Ne jamais écrire
 un jeton dans la configuration.
 
-Depuis la racine de la copie du projet, remplacer `MON_LOGIN` et `MON_DEPOT`.
-Le dépôt cible et le GitHub Project doivent appartenir au même propriétaire :
-`--owner` indique ce propriétaire et `--repo` accepte uniquement le nom du
-dépôt, sans préfixe propriétaire.
+Depuis la racine de la copie du projet, remplacer `MON_DEPOT` et, pour une
+cible d'organisation, `MON_ORGANISATION`. Sans `--owner`, le générateur utilise
+le login authentifié par `gh`, ce qui convient à un dépôt personnel. Pour une
+organisation, fournir son nom avec `--owner`. Le dépôt cible et le GitHub
+Project doivent appartenir au même propriétaire ; `--repo` accepte uniquement
+le nom du dépôt, sans préfixe propriétaire.
 
 ```sh
 # Vérifier les tickets localement : aucune requête GitHub, aucune écriture.

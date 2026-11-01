@@ -27,14 +27,16 @@ le permet, ajoutez l'accès aux Projects avec
 l'organisation cible peuvent limiter ces opérations.
 
 Le fork sert de copie du générateur : `--repo` désigne uniquement le nom du
-dépôt cible, et `--owner` son propriétaire. Les issues et le GitHub Project
-doivent appartenir au même propriétaire ; le fork du générateur n'est pas la
-cible, sauf si vous souhaitez réellement y créer le backlog. Remplacez
-`MON_LOGIN` et `MON_DEPOT`, puis lancez d'abord une simulation et l'import :
+dépôt cible. Sans `--owner`, le générateur utilise le login authentifié par
+`gh` comme propriétaire ; ajoutez `--owner ORGANISATION` pour une cible dans
+une organisation. Les issues et le GitHub Project doivent appartenir au même
+propriétaire ; le fork du générateur n'est pas la cible, sauf si vous souhaitez
+réellement y créer le backlog. Remplacez `MON_DEPOT`, puis lancez d'abord une
+simulation et l'import :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --dry-run
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --apply
 ```
 
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
@@ -50,14 +52,16 @@ Cloner ce dépôt, puis exécuter les commandes depuis son répertoire :
 git clone https://github.com/but-sd/themoviedb-discovery-app-backlog-generator.git
 cd themoviedb-discovery-app-backlog-generator
 npm ci
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --dry-run
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --apply
 ```
 
 Node.js 24 ou supérieur et le CLI GitHub `gh` authentifié avec les droits sur
 les issues et Projects sont requis. Ne pas cibler ce dépôt de générateur pour
 instancier les tickets de l'application. `--repo` accepte uniquement le nom
-du dépôt ; `--owner` est le propriétaire commun du dépôt et du GitHub Project.
+du dépôt. Sans `--owner`, le login authentifié par `gh` est utilisé ; fournir
+`--owner ORGANISATION` pour une cible d'organisation. Le dépôt cible et le
+GitHub Project doivent appartenir au même propriétaire.
 
 ## Configuration et reprise
 
@@ -70,7 +74,7 @@ Les liens vers les PR de référence restent ceux de l'application.
 Pour reprendre le même projet, conserver son numéro :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --project-number NUMERO --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --project-number NUMERO --apply
 ```
 
 Sans numéro, `--apply` crée un nouveau projet. Les relances ne dupliquent pas

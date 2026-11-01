@@ -607,11 +607,13 @@ export function parseOptions(args) {
     typeof values.repo === 'string' && /^[A-Za-z0-9_.-]+$/.test(values.repo),
     '--repo NOM_DU_DEPOT est obligatoire (sans proprietaire).',
   );
-  requireValue(
-    typeof values.owner === 'string' && /^[A-Za-z0-9-]+$/.test(values.owner),
-    '--owner LOGIN est obligatoire (utilisateur ou organisation).',
-  );
-  values.repo = `${values.owner}/${values.repo}`;
+  if (values.owner !== undefined) {
+    requireValue(
+      /^[A-Za-z0-9-]+$/.test(values.owner),
+      '--owner doit etre un login utilisateur ou organisation valide.',
+    );
+    values.repo = `${values.owner}/${values.repo}`;
+  }
   requireValue(
     !values['project-number'] || /^[1-9]\d*$/.test(values['project-number']),
     '--project-number doit etre un entier positif.',
@@ -685,7 +687,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
   const allTickets = config.epics.flatMap((epic) => epic.tickets);
   if (!options.apply) {
     log(
-      `Simulation : ${options.repo}, proprietaire ${options.owner}, ${allTickets.length} tickets. Aucune requete GitHub.`,
+      `Simulation : ${options.repo}${options.owner ? `, proprietaire ${options.owner}` : ''}, ${allTickets.length} tickets. Aucune requete GitHub.`,
     );
     if (options['update-existing']) {
       log(
@@ -704,6 +706,15 @@ export function instantiate(config, options, run = gh, log = console.log) {
   }
 
   run(['auth', 'status']);
+  if (!options.owner) {
+    const user = json(run, ['api', 'user']);
+    requireValue(
+      typeof user.login === 'string' && /^[A-Za-z0-9-]+$/.test(user.login),
+      'Impossible de determiner le proprietaire : fournir --owner pour un depot d organisation.',
+    );
+    options.owner = user.login;
+    options.repo = `${options.owner}/${options.repo}`;
+  }
   const repository = json(run, [
     'repo',
     'view',
@@ -1178,7 +1189,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
   if (options.help) {
     console.log(
-      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT --owner LOGIN [--config FILE] [--project-number N] [--update-existing] [--dry-run | --apply]\nSans --apply : simulation locale, sans requete GitHub.\nLe depot cible et le GitHub Project appartiennent au meme proprietaire, indique par --owner.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
+      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing] [--dry-run | --apply]\nSans --apply : simulation locale, sans requete GitHub.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
     );
     return;
   }
