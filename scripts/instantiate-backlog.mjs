@@ -604,14 +604,14 @@ export function parseOptions(args) {
   );
   if (values.help) return values;
   requireValue(
-    typeof values.repo === 'string' &&
-      /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(values.repo),
-    '--repo OWNER/REPO est obligatoire.',
+    typeof values.repo === 'string' && /^[A-Za-z0-9_.-]+$/.test(values.repo),
+    '--repo NOM_DU_DEPOT est obligatoire (sans proprietaire).',
   );
   requireValue(
     typeof values.owner === 'string' && /^[A-Za-z0-9-]+$/.test(values.owner),
     '--owner LOGIN est obligatoire (utilisateur ou organisation).',
   );
+  values.repo = `${values.owner}/${values.repo}`;
   requireValue(
     !values['project-number'] || /^[1-9]\d*$/.test(values['project-number']),
     '--project-number doit etre un entier positif.',
@@ -1178,7 +1178,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
   if (options.help) {
     console.log(
-      'Usage : npm run backlog:instantiate -- --repo OWNER/REPO --owner LOGIN [--config FILE] [--project-number N] [--update-existing] [--dry-run | --apply]\nSans --apply : simulation locale, sans requete GitHub.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
+      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT --owner LOGIN [--config FILE] [--project-number N] [--update-existing] [--dry-run | --apply]\nSans --apply : simulation locale, sans requete GitHub.\nLe depot cible et le GitHub Project appartiennent au meme proprietaire, indique par --owner.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
     );
     return;
   }
