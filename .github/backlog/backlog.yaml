@@ -236,9 +236,9 @@ epics:
         title: Mettre en place le service permettant de mettre à jour les films, genres et pays à partir des APIs mises en place
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir mettre à jour les films, genres et pays à partir des APIs mises en place afin de maintenir une liste de films cohérente et à jour.
-        size: M
+        size: L
         priority: P3
-        dependsOn: []
+        dependsOn: [DASHBOARD-03, DASHBOARD-05, DASHBOARD-08]
         acceptance:
           - Un module dédié permet de mettre à jour les films, genres et pays à partir des APIs mises en place.
         definitionOfDone:
