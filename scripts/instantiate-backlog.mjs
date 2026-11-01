@@ -47,12 +47,6 @@ export function validateBacklog(config) {
       config.project.viewName.trim(),
     'Nom de vue manquant.',
   );
-  requireValue(
-    typeof config.project.epicViewName === 'string' &&
-      config.project.epicViewName.trim() &&
-      config.project.epicViewName !== config.project.viewName,
-    'Nom de vue Epic manquant ou identique a la vue Backlog.',
-  );
   if (config.project.backlogColumns !== undefined)
     requireValue(
       Array.isArray(config.project.backlogColumns) &&
@@ -103,8 +97,7 @@ export function validateBacklog(config) {
         (view) =>
           typeof view.name === 'string' &&
           view.name.trim() &&
-          view.name !== config.project.viewName &&
-          view.name !== config.project.epicViewName,
+          view.name !== config.project.viewName,
       ) &&
       config.project.typeViews
         .map((view) => view.type)
@@ -320,6 +313,28 @@ function ensureTypeViews(
   columns,
   log,
 ) {
+  ensureFilteredViews(
+    run,
+    projectId,
+    definitions.map((definition) => ({
+      name: definition.name,
+      filter: personal
+        ? `label:${definition.type}`
+        : `type:${nativeTypes.get(definition.type)}`,
+    })),
+    columns,
+    log,
+  );
+}
+
+function ensureFilteredViews(
+  run,
+  projectId,
+  definitions,
+  columns,
+  log,
+  exact = false,
+) {
   for (const definition of definitions) {
     ensureBacklogView(run, projectId, definition.name, log);
     const data = graphql(
@@ -345,9 +360,7 @@ function ensureTypeViews(
       (candidate) => candidate.name === definition.name,
     );
     requireValue(view, `Vue ${definition.name} absente.`);
-    const filter = personal
-      ? `label:${definition.type}`
-      : `type:${nativeTypes.get(definition.type)}`;
+    const filter = definition.filter;
     if (view.filter !== filter) {
       graphql(
         run,
@@ -364,7 +377,7 @@ function ensureTypeViews(
         { id: view.id, filter },
       );
     }
-    ensureBacklogColumns(run, projectId, definition.name, columns);
+    ensureBacklogColumns(run, projectId, definition.name, columns, exact);
   }
 }
 
@@ -648,6 +661,7 @@ export function parseOptions(args) {
       apply: { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       'update-existing': { type: 'boolean', default: false },
+      'force-update': { type: 'boolean', default: false },
       'create-issues': { type: 'boolean', default: false },
       prune: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
@@ -837,6 +851,13 @@ export function syncDependencies(run, projectId, itemId, fields, ticket) {
   ]);
 }
 
+function keepFieldValue(nodes, name, value, forceUpdate) {
+  const current = nodes?.find((entry) => entry.field?.name === name);
+  return (
+    current && (!forceUpdate || name === 'Status' || current.name === value)
+  );
+}
+
 function instantiateDrafts(config, options, run, log, project) {
   const items = [];
   let cursor = null;
@@ -998,7 +1019,7 @@ function instantiateDrafts(config, options, run, log, project) {
   for (const { epic, ticket } of tickets) {
     const item = matched.get(ticket.id);
     syncDependencies(run, project.id, item.id, fields, ticket);
-    if (item.created || options['update-existing']) {
+    if (item.created || options['update-existing'] || options['force-update']) {
       const title = `[${ticket.id}] ${ticket.title}`;
       const body = issueBody(epic, ticket, config, urls);
       if (item.content.title !== title || item.content.body !== body)
@@ -1016,9 +1037,6 @@ function instantiateDrafts(config, options, run, log, project) {
           { input: { draftIssueId: item.content.id, title, body } },
         );
     }
-    const populated = new Set(
-      item.fieldValues.nodes.map((value) => value.field?.name),
-    );
     for (const [name, value] of Object.entries({
       Status: 'Backlog',
       Epic: epic.id,
@@ -1026,7 +1044,15 @@ function instantiateDrafts(config, options, run, log, project) {
       Size: ticket.size,
       ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
     })) {
-      if (populated.has(name)) continue;
+      if (
+        keepFieldValue(
+          item.fieldValues.nodes,
+          name,
+          value,
+          options['force-update'],
+        )
+      )
+        continue;
       const field = fields.find((field) => field.name === name);
       const option = field?.options?.find((option) => option.name === value);
       requireValue(option, `Option ${value} absente de ${name}.`);
@@ -1069,6 +1095,10 @@ export function instantiate(config, options, run = gh, log = console.log) {
         'Avec --apply, les titres et descriptions existants seront remplaces par la configuration, y compris les modifications manuelles.',
       );
     }
+    if (options['force-update'])
+      log(
+        'Avec --apply --force-update, le YAML remplace les contenus et champs declares, y compris les modifications manuelles. Le statut et les valeurs absentes du YAML sont conserves.',
+      );
     for (const milestone of config.milestones ?? [])
       log(`Milestone | ${milestone.title}`);
     for (const epic of config.epics) {
@@ -1223,16 +1253,45 @@ export function instantiate(config, options, run = gh, log = console.log) {
   }
 
   const projectArgs = ['--owner', options.owner, '--format', 'json'];
-  const isNew = !options['project-number'];
-  const project = isNew
-    ? json(run, [
+  const projectTitle = `${config.project.title} - ${options.repo.split('/')[1]}`;
+  let project;
+  let isNew = false;
+  if (options['project-number']) {
+    project = json(run, [
+      'project',
+      'view',
+      options['project-number'],
+      ...projectArgs,
+    ]);
+  } else {
+    const listed = json(run, [
+      'project',
+      'list',
+      ...projectArgs,
+      '--limit',
+      '1000',
+    ]);
+    const projects = Array.isArray(listed) ? listed : listed.projects;
+    requireValue(Array.isArray(projects), 'Liste des projets invalide.');
+    const matches = projects.filter(
+      (candidate) => candidate.title === projectTitle,
+    );
+    requireValue(
+      matches.length <= 1,
+      `Plusieurs projets nommes "${projectTitle}" : preciser --project-number.`,
+    );
+    project = matches[0];
+    if (!project) {
+      project = json(run, [
         'project',
         'create',
         ...projectArgs,
         '--title',
-        `${config.project.title} - ${options.repo.split('/')[1]}`,
-      ])
-    : json(run, ['project', 'view', options['project-number'], ...projectArgs]);
+        projectTitle,
+      ]);
+      isNew = true;
+    }
+  }
   requireValue(
     project.id && project.number && project.url,
     'Reponse de projet incomplete.',
@@ -1391,26 +1450,34 @@ export function instantiate(config, options, run = gh, log = console.log) {
       ],
       'scope',
     );
+  const backlogColumns = config.project.backlogColumns
+    ? config.project.backlogColumns.map((name) => {
+        const field = fields.find((candidate) => candidate.name === name);
+        requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
+        return field.id;
+      })
+    : allTickets.some((ticket) => ticket.scope !== undefined)
+      ? [...visibleFields, scopeField.id]
+      : visibleFields;
   ensureBacklogColumns(
     run,
     project.id,
     config.project.viewName,
-    config.project.backlogColumns
-      ? config.project.backlogColumns.map((name) => {
-          const field = fields.find((candidate) => candidate.name === name);
-          requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
-          return field.id;
-        })
-      : allTickets.some((ticket) => ticket.scope !== undefined)
-        ? [...visibleFields, scopeField.id]
-        : visibleFields,
+    backlogColumns,
     config.project.backlogColumns !== undefined,
   );
-  ensureBacklogView(run, project.id, config.project.epicViewName, log);
-  ensureBacklogColumns(run, project.id, config.project.epicViewName, [
-    visibleFields[0],
-    visibleFields[1],
-  ]);
+  if (scopeField)
+    ensureFilteredViews(
+      run,
+      project.id,
+      ['backend', 'frontend'].map((scope) => ({
+        name: `Backlog ${scope}`,
+        filter: `scope:${scope}`,
+      })),
+      backlogColumns,
+      log,
+      config.project.backlogColumns !== undefined,
+    );
   if (options['create-issues'])
     ensureTypeViews(
       run,
@@ -1499,7 +1566,13 @@ export function instantiate(config, options, run = gh, log = console.log) {
       log(`Issue creee : ${issue.html_url}`);
     }
     const existing = issuesById.get(ticket.id);
-    if (existing && ticket.milestone && !existing.milestone) {
+    if (
+      existing &&
+      ticket.milestone &&
+      (!existing.milestone ||
+        (options['force-update'] &&
+          existing.milestone.number !== milestones.get(ticket.milestone)))
+    ) {
       requireValue(
         Number.isInteger(existing.number) && existing.number > 0,
         `Numero d issue manquant pour ${ticket.id}.`,
@@ -1546,17 +1619,31 @@ export function instantiate(config, options, run = gh, log = console.log) {
         `${personal ? `Label ${ticket.type} ajoute` : `Type ${nativeType} defini`} : ${existing.html_url}`,
       );
     }
+    if (existing && personal && options['force-update']) {
+      const opposite = ticket.type === 'feature' ? 'bug' : 'feature';
+      const label = existing.labels?.find(
+        (candidate) => candidate.name.toLowerCase() === opposite,
+      );
+      if (label) {
+        requireValue(
+          Number.isInteger(existing.number) && existing.number > 0,
+          `Numero d issue manquant pour ${ticket.id}.`,
+        );
+        run([
+          'api',
+          `repos/${options.repo}/issues/${existing.number}/labels/${encodeURIComponent(label.name)}`,
+          '--method',
+          'DELETE',
+        ]);
+        log(`Label ${label.name} retire : ${existing.html_url}`);
+      }
+    }
     const url = issueUrls.get(ticket.id);
     const existingItem = items.get(url);
     const item =
       existingItem ??
       json(run, ['project', 'item-add', number, ...projectArgs, '--url', url]);
     requireValue(item.id, `Ajout au projet de ${ticket.id} sans identifiant.`);
-    const populated = new Set(
-      existingItem?.fieldValues.nodes
-        .filter((value) => value.field?.name)
-        .map((value) => value.field.name),
-    );
     syncDependencies(run, project.id, item.id, fields, ticket);
     const values = {
       Status: 'Backlog',
@@ -1570,7 +1657,15 @@ export function instantiate(config, options, run = gh, log = console.log) {
       ...fieldNames,
       ...(ticket.scope !== undefined ? ['scope'] : []),
     ]) {
-      if (populated.has(name)) continue;
+      if (
+        keepFieldValue(
+          existingItem?.fieldValues.nodes,
+          name,
+          values[name],
+          options['force-update'],
+        )
+      )
+        continue;
       const field = fields.find((candidate) => candidate.name === name);
       requireValue(field, `Champ ${name} absent.`);
       const args = [
@@ -1592,7 +1687,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
     }
   }
   let updated = 0;
-  if (options['update-existing']) {
+  if (options['update-existing'] || options['force-update']) {
     for (const epic of config.epics) {
       for (const ticket of epic.tickets) {
         const existing = issuesById.get(ticket.id);
@@ -1631,7 +1726,11 @@ export function instantiate(config, options, run = gh, log = console.log) {
       true,
     );
   log(
-    `${allTickets.length} tickets presents dans le projet. ${updated} contenu(s) mis a jour. Les champs deja renseignes sont conserves.`,
+    `${allTickets.length} tickets presents dans le projet. ${updated} contenu(s) mis a jour. ${
+      options['force-update']
+        ? 'Les champs declares dans le YAML sont synchronises ; le statut et les valeurs absentes sont conserves.'
+        : 'Les champs deja renseignes sont conserves.'
+    }`,
   );
 }
 
@@ -1639,10 +1738,13 @@ export function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
   if (options.help) {
     console.log(
+      '--force-update : synchronise les titres, descriptions et champs declares depuis le YAML ; conserve le statut, les valeurs absentes du YAML et les commentaires.',
+    );
+    console.log(
       '--apply utilise des brouillons par defaut. Ajouter --create-issues pour creer des issues ; --prune exige aussi --create-issues.',
     );
     console.log(
-      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing] [--prune] [--dry-run | --apply]\nSans --apply : simulation locale, sauf --prune qui consulte GitHub sans ecriture.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--prune exige --project-number : ferme les issues generees absentes du YAML et les retire uniquement du projet cible.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
+      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing | --force-update] [--prune] [--dry-run | --apply]\nSans --apply : simulation locale, sauf --prune qui consulte GitHub sans ecriture.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--prune exige --project-number : ferme les issues generees absentes du YAML et les retire uniquement du projet cible.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
     );
     return;
   }

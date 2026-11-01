@@ -13,7 +13,6 @@ project:
     - Priority
     - dependsOn
     - Status
-  epicViewName: Epics
   typeViews:
     - name: Features
       type: feature

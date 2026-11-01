@@ -124,14 +124,6 @@ test('milestones are optional, unique and referenced by title', () => {
   }
 });
 
-test('epic view name is required and unique from other project views', () => {
-  for (const epicViewName of ['', 'Backlog', 'Features', 'Bugs']) {
-    const invalid = structuredClone(configuredBacklog);
-    invalid.project.epicViewName = epicViewName;
-    assert.throws(() => validateBacklog(invalid), /vue/i);
-  }
-});
-
 test('milestone simulation stays local and displays definitions and ticket references', () => {
   const simulation = structuredClone(config);
   simulation.milestones = [{ title: '1.1.0' }];
@@ -514,6 +506,29 @@ test('scope supports backend/frontend and remains optional for older configurati
           { backend: 'BLUE', frontend: 'PURPLE' }[option.name] ?? option.color,
       })),
     );
+    const viewWrites = f.calls
+      .filter(({ args }) => args[1] === 'graphql')
+      .map(({ input }) => JSON.parse(input));
+    assert.deepEqual(
+      viewWrites
+        .filter(({ query }) => query.includes('createProjectV2View'))
+        .map(({ variables }) => variables.name),
+      ['Backlog backend', 'Backlog frontend'],
+    );
+    assert.deepEqual(
+      viewWrites
+        .filter(({ variables }) => variables.filter !== undefined)
+        .map(({ variables }) => variables.filter),
+      ['scope:backend', 'scope:frontend'],
+    );
+    for (const viewName of ['Backlog backend', 'Backlog frontend'])
+      assert.ok(
+        viewWrites.some(
+          ({ variables }) =>
+            variables.id === viewName &&
+            variables.fields?.join(',') === 'title,epic,size,scope',
+        ),
+      );
   }
   for (const scope of ['feature', '', null, 42]) {
     const invalid = structuredClone(config);
@@ -763,6 +778,8 @@ test('issue body includes story, size, criteria, dependency URLs and Done withou
 
 function fixture({
   existing = false,
+  existingProject = false,
+  scope,
   missingSize = false,
   failEdit = false,
 } = {}) {
@@ -770,6 +787,7 @@ function fixture({
   small.epics = [small.epics.find((epic) => epic.id === 'WATCH')];
   small.epics[0].tickets = [small.epics[0].tickets[0]];
   const ticket = small.epics[0].tickets[0];
+  if (scope !== undefined) ticket.scope = scope;
   const url = 'https://github.com/student/movies/issues/1';
   const fields = [
     { id: 'title', name: 'Title' },
@@ -790,7 +808,17 @@ function fixture({
       options: ['P1', 'P2', 'P3'].map((name) => ({ id: name, name })),
     },
   ];
+  if (scope !== undefined)
+    fields.push({
+      id: 'scope',
+      name: 'scope',
+      options: [
+        { id: 'backend', name: 'backend', color: 'BLUE' },
+        { id: 'frontend', name: 'frontend', color: 'PURPLE' },
+      ],
+    });
   const calls = [];
+  const extraViews = [];
   const typeViews = ['Features', 'Bugs'].map((name, index) => ({
     id: `type-view-${index}`,
     name,
@@ -802,14 +830,6 @@ function fixture({
       },
     },
   }));
-  const epicView = {
-    id: 'epic-view',
-    name: configuredBacklog.project.epicViewName,
-    number: 4,
-    configuration: {
-      visibleFields: { nodes: [{ id: 'title' }, { id: 'epic' }] },
-    },
-  };
   function run(args, input) {
     calls.push({ args, input });
     const command = args.slice(0, 2).join(' ');
@@ -820,6 +840,19 @@ function fixture({
       return JSON.stringify({
         hasIssuesEnabled: true,
         viewerPermission: 'WRITE',
+      });
+    if (command === 'project list')
+      return JSON.stringify({
+        projects: existingProject
+          ? [
+              {
+                id: 'project',
+                number: 7,
+                title: `${small.project.title} - movies`,
+                url: 'https://github.com/users/student/projects/7',
+              },
+            ]
+          : [],
       });
     if (args[0] === 'api' && args[1].includes('/issues?')) {
       return JSON.stringify([
@@ -851,6 +884,21 @@ function fixture({
     if (command === 'project field-list') return JSON.stringify({ fields });
     if (command === 'api graphql') {
       const payload = JSON.parse(input);
+      if (payload.query.includes('createProjectV2View')) {
+        const view = {
+          id: payload.variables.name,
+          name: payload.variables.name,
+          number: extraViews.length + 4,
+          filter: '',
+          configuration: {
+            visibleFields: { nodes: [{ id: 'title' }] },
+          },
+        };
+        extraViews.push(view);
+        return JSON.stringify({
+          data: { createProjectV2View: { projectV2View: view } },
+        });
+      }
       if (
         payload.variables.id === 'size' &&
         /options\s*\{\s*id\s+name\s+color\s+description\s*\}/.test(
@@ -882,9 +930,14 @@ function fixture({
                 options: field.options.map((option) => ({
                   ...option,
                   color:
-                    { P1: 'RED', P2: 'ORANGE', P3: 'YELLOW', WATCH: 'ORANGE' }[
-                      option.name
-                    ] ?? 'GRAY',
+                    {
+                      P1: 'RED',
+                      P2: 'ORANGE',
+                      P3: 'YELLOW',
+                      WATCH: 'ORANGE',
+                      backend: 'BLUE',
+                      frontend: 'PURPLE',
+                    }[option.name] ?? 'GRAY',
                   description: '',
                 })),
               },
@@ -897,6 +950,7 @@ function fixture({
             node: {
               views: {
                 nodes: [
+                  ...extraViews,
                   ...typeViews,
                   {
                     id: 'view',
@@ -911,7 +965,6 @@ function fixture({
                       },
                     },
                   },
-                  epicView,
                 ],
               },
             },
@@ -924,7 +977,7 @@ function fixture({
               views: {
                 nodes: [
                   { id: 'view', name: 'Backlog', number: 1 },
-                  epicView,
+                  ...extraViews,
                   ...typeViews,
                 ],
                 pageInfo: { hasNextPage: false },
@@ -934,7 +987,17 @@ function fixture({
         });
       if (payload.query.includes('updateProjectV2Field'))
         return JSON.stringify({ data: { updateProjectV2Field: {} } });
-      if (payload.query.includes('updateProjectV2View'))
+      if (payload.query.includes('updateProjectV2View')) {
+        const view = extraViews.find(
+          (candidate) => candidate.id === payload.variables.id,
+        );
+        if (view) {
+          if (payload.variables.filter !== undefined)
+            view.filter = payload.variables.filter;
+          if (payload.variables.fields)
+            view.configuration.visibleFields.nodes =
+              payload.variables.fields.map((id) => ({ id }));
+        }
         return JSON.stringify({
           data: {
             updateProjectV2View: {
@@ -942,6 +1005,7 @@ function fixture({
             },
           },
         });
+      }
       if (payload.query.includes('dataType'))
         return JSON.stringify({ data: { node: { dataType: 'NUMBER' } } });
       const nodes = existing
@@ -988,8 +1052,53 @@ function fixture({
   };
 }
 
+test('apply reuses the generated-title project when no project number is given', () => {
+  const f = fixture({ existingProject: true });
+  delete f.options['project-number'];
+  instantiate(f.small, f.options, f.run, () => {});
+  assert.ok(
+    f.calls.some(({ args }) => args.slice(0, 2).join(' ') === 'project list'),
+  );
+  assert.ok(
+    !f.calls.some(
+      ({ args }) => args.slice(0, 2).join(' ') === 'project create',
+    ),
+  );
+  assert.ok(
+    f.calls.some(
+      ({ args }) =>
+        args.slice(0, 2).join(' ') === 'project field-list' &&
+        args.includes('7'),
+    ),
+  );
+});
+
+test('apply rejects duplicate projects with the generated title', () => {
+  const f = fixture({ existingProject: true });
+  delete f.options['project-number'];
+  const listProjects = f.run;
+  f.run = (args, input) => {
+    if (args.slice(0, 2).join(' ') === 'project list') {
+      const result = JSON.parse(listProjects(args, input));
+      result.projects.push({ ...result.projects[0], number: 8 });
+      return JSON.stringify(result);
+    }
+    return listProjects(args, input);
+  };
+  assert.throws(
+    () => instantiate(f.small, f.options, f.run, () => {}),
+    /preciser --project-number/,
+  );
+  assert.ok(
+    !f.calls.some(
+      ({ args }) => args.slice(0, 2).join(' ') === 'project create',
+    ),
+  );
+});
+
 test('apply defaults to draft tickets, reuses stable keys and never creates issues', () => {
-  const f = fixture({ existing: true });
+  const f = fixture({ existing: true, scope: 'frontend' });
+  f.small.project.backlogColumns = ['Title', 'scope', 'Status'];
   const draftOptions = { ...f.options, 'create-issues': false };
   let items = [];
   let creates = 0;
@@ -1036,6 +1145,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
         size: 'Size',
         epic: 'Epic',
         priority: 'Priority',
+        scope: 'scope',
       }[field];
       items[0].fieldValues.nodes.push({ field: { name }, name: 'kept' });
       return '';
@@ -1045,6 +1155,29 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   instantiate(f.small, draftOptions, drafts, () => {});
   instantiate(f.small, draftOptions, drafts, () => {});
   assert.equal(creates, 1);
+  const viewWrites = f.calls
+    .filter(({ args }) => args[1] === 'graphql')
+    .map(({ input }) => JSON.parse(input));
+  assert.deepEqual(
+    viewWrites
+      .filter(({ query }) => query.includes('createProjectV2View'))
+      .map(({ variables }) => variables.name),
+    ['Backlog backend', 'Backlog frontend'],
+  );
+  assert.deepEqual(
+    viewWrites
+      .filter(({ variables }) => variables.filter !== undefined)
+      .map(({ variables }) => variables.filter),
+    ['scope:backend', 'scope:frontend'],
+  );
+  for (const name of ['Backlog backend', 'Backlog frontend'])
+    assert.ok(
+      viewWrites.some(
+        ({ variables }) =>
+          variables.id === name &&
+          variables.fields?.join(',') === 'title,scope,status',
+      ),
+    );
   assert.ok(!f.calls.some(({ args }) => args.includes('POST')));
   assert.equal(parseOptions(['--repo', 'movies'])['create-issues'], false);
   assert.throws(
@@ -1057,6 +1190,202 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   instantiate(f.small, draftOptions, drafts, () => {});
   assert.equal(mutations.length, 1);
   assert.ok(items[0].content.title.includes('Updated draft'));
+  const originalRun = drafts;
+  const edits = [];
+  const forceRun = (args, input) => {
+    if (args[1] === 'item-edit') {
+      const field = args[args.indexOf('--field-id') + 1];
+      const name = {
+        size: 'Size',
+        epic: 'Epic',
+        priority: 'Priority',
+        scope: 'scope',
+      }[field];
+      assert.ok(name, 'Existing status must be preserved');
+      const value = items[0].fieldValues.nodes.find(
+        (value) => value.field.name === name,
+      );
+      value.name = args[args.indexOf('--single-select-option-id') + 1];
+      edits.push(name);
+      return '';
+    }
+    return originalRun(args, input);
+  };
+  delete draftOptions['update-existing'];
+  draftOptions['force-update'] = true;
+  const ticket = f.small.epics[0].tickets[0];
+  ticket.title = 'Forced title';
+  ticket.priority = 'P2';
+  ticket.size = 'L';
+  ticket.scope = 'backend';
+  instantiate(f.small, draftOptions, forceRun, () => {});
+  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Size', 'scope']);
+  assert.ok(items[0].content.title.includes('Forced title'));
+  const count = edits.length;
+  instantiate(f.small, draftOptions, forceRun, () => {});
+  assert.equal(edits.length, count);
+  delete ticket.scope;
+  instantiate(f.small, draftOptions, forceRun, () => {});
+  assert.equal(edits.length, count);
+  assert.equal(
+    items[0].fieldValues.nodes.find((value) => value.field.name === 'scope')
+      .name,
+    'backend',
+  );
+});
+
+test('force-update synchronizes issue content and declared fields, preserving status and absent values', () => {
+  const f = fixture({ existing: true, scope: 'backend' });
+  const ticket = f.small.epics[0].tickets[0];
+  ticket.priority = 'P2';
+  ticket.size = 'L';
+  ticket.milestone = '2.0.0';
+  f.small.milestones = [{ title: '2.0.0' }];
+  const existing = {
+    number: 1,
+    html_url: 'https://github.com/student/movies/issues/1',
+    title: 'Manual title',
+    body: marker(ticket.id),
+    milestone: { number: 9 },
+    type: { name: 'Bug' },
+    state: 'closed',
+  };
+  const nodes = ['Status', 'Size', 'Epic', 'Priority', 'scope', 'Custom'].map(
+    (name) => ({
+      field: { name },
+      name: 'manual',
+    }),
+  );
+  const edits = [];
+  const patches = [];
+  const run = (args, input) => {
+    if (args[1].includes('/issues?')) return JSON.stringify([[existing]]);
+    if (args[1].includes('/milestones?'))
+      return JSON.stringify([[{ title: '2.0.0', number: 5 }]]);
+    if (args.includes('PATCH')) {
+      const patch = JSON.parse(input);
+      patches.push(patch);
+      if (patch.milestone) existing.milestone = { number: patch.milestone };
+      if (patch.type) existing.type = { name: patch.type };
+      if (patch.title) Object.assign(existing, patch);
+      return '{}';
+    }
+    if (
+      args[1] === 'graphql' &&
+      JSON.parse(input).query.includes('items(first:')
+    ) {
+      const result = JSON.parse(f.run(args, input));
+      result.data.node.items.nodes[0].fieldValues.nodes = nodes;
+      return JSON.stringify(result);
+    }
+    if (args[1] === 'item-edit') {
+      const field = args[args.indexOf('--field-id') + 1];
+      const name = {
+        size: 'Size',
+        epic: 'Epic',
+        priority: 'Priority',
+        scope: 'scope',
+      }[field];
+      assert.ok(name, 'Status and custom fields must not be overwritten');
+      nodes.find((entry) => entry.field.name === name).name =
+        args[args.indexOf('--single-select-option-id') + 1];
+      edits.push(name);
+      return '';
+    }
+    return f.run(args, input);
+  };
+  const options = { ...f.options, 'force-update': true };
+  instantiate(f.small, options, run, () => {});
+  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Size', 'scope']);
+  assert.equal(existing.milestone.number, 5);
+  assert.equal(existing.type.name, 'Feature');
+  assert.equal(existing.title, `[${ticket.id}] ${ticket.title}`);
+  assert.ok(existing.body.includes('Taille : L'));
+  assert.equal(existing.state, 'closed');
+  assert.equal(
+    nodes.find((entry) => entry.field.name === 'Status').name,
+    'manual',
+  );
+  const count = patches.length;
+  instantiate(f.small, options, run, () => {});
+  assert.equal(patches.length, count);
+  assert.equal(edits.length, 4);
+  delete ticket.scope;
+  delete ticket.milestone;
+  instantiate(f.small, options, run, () => {});
+  assert.equal(existing.milestone.number, 5);
+  assert.equal(
+    nodes.find((entry) => entry.field.name === 'scope').name,
+    'backend',
+  );
+  assert.equal(edits.length, 4);
+});
+
+test('force-update simulation stays local and warns about overwrites', () => {
+  const options = parseOptions([
+    '--repo',
+    'movies',
+    '--force-update',
+    '--dry-run',
+  ]);
+  assert.equal(options['force-update'], true);
+  const output = [];
+  instantiate(
+    config,
+    options,
+    () => assert.fail('Unexpected GitHub call'),
+    (line) => output.push(line),
+  );
+  assert.ok(output.some((line) => line.includes('modifications manuelles')));
+  assert.ok(output.some((line) => line.includes('statut')));
+});
+
+test('force-update removes only the opposite type label in a personal repository', () => {
+  const f = fixture({ existing: true });
+  const ticket = f.small.epics[0].tickets[0];
+  const existing = {
+    number: 1,
+    html_url: 'https://github.com/student/movies/issues/1',
+    title: `[${ticket.id}] ${ticket.title}`,
+    body: issueBody(f.small.epics[0], ticket, f.small, new Map()),
+    labels: [{ name: 'feature' }, { name: 'BUG' }, { name: 'custom' }],
+  };
+  const removed = [];
+  const run = (args, input) => {
+    if (args[1] === 'repos/student/movies')
+      return JSON.stringify({ owner: { type: 'User' } });
+    if (args[1].includes('/issues?')) return JSON.stringify([[existing]]);
+    if (args[1].includes('/labels?'))
+      return JSON.stringify([[{ name: 'feature' }]]);
+    if (args.includes('DELETE')) {
+      assert.equal(args[1], 'repos/student/movies/issues/1/labels/BUG');
+      removed.push('BUG');
+      existing.labels = existing.labels.filter((label) => label.name !== 'BUG');
+      return '{}';
+    }
+    return f.run(args, input);
+  };
+  const options = { ...f.options, 'force-update': true };
+  instantiate(f.small, options, run, () => {});
+  instantiate(f.small, options, run, () => {});
+  assert.deepEqual(removed, ['BUG']);
+  assert.deepEqual(existing.labels, [{ name: 'feature' }, { name: 'custom' }]);
+});
+
+test('force-update surfaces field update failures without a success summary', () => {
+  const f = fixture({ existing: true, failEdit: true });
+  const output = [];
+  assert.throws(
+    () =>
+      instantiate(
+        f.small,
+        { ...f.options, 'force-update': true },
+        f.run,
+        (line) => output.push(line),
+      ),
+    /Permission refusee/,
+  );
+  assert.ok(!output.some((line) => line.includes('tickets presents')));
 });
 
 test('apply creates issues and assigns Backlog, size, epic and priority', () => {
@@ -1693,10 +2022,13 @@ test('default view is renamed to configured Backlog once, without altering its l
   assert.equal(updates.length, 1);
 });
 
-test('custom views are preserved and missing Backlog and Epics views are created', () => {
+test('custom views are preserved and only the missing Backlog view is created', () => {
   const { small, run, options } = fixture({ existing: true });
-  const views = [{ id: 'custom', name: 'Sprint actuel', number: 1 }];
-  const original = structuredClone(views[0]);
+  const views = [
+    { id: 'custom', name: 'Sprint actuel', number: 1 },
+    { id: 'legacy-epics', name: 'Epics', number: 2 },
+  ];
+  const original = structuredClone(views);
   const createdNames = [];
   function withCustomView(args, input) {
     if (args[1] === 'graphql') {
@@ -1711,8 +2043,7 @@ test('custom views are preserved and missing Backlog and Epics views are created
                   ...views,
                   ...(createdNames.length
                     ? JSON.parse(run(args, input)).data.node.views.nodes.filter(
-                        (candidate) =>
-                          !['Backlog', 'Epics'].includes(candidate.name),
+                        (candidate) => candidate.name !== 'Backlog',
                       )
                     : []),
                 ],
@@ -1724,7 +2055,7 @@ test('custom views are preserved and missing Backlog and Epics views are created
 
       assert.ok(!query.includes('updateProjectV2View'));
       if (query.includes('createProjectV2View')) {
-        assert.ok(['Backlog', 'Epics'].includes(variables.name));
+        assert.equal(variables.name, 'Backlog');
         assert.ok(query.includes('TABLE_LAYOUT'));
         const view = { id: 'new-view', name: variables.name, number: 2 };
         views.push(view);
@@ -1738,8 +2069,8 @@ test('custom views are preserved and missing Backlog and Epics views are created
   }
   instantiate(small, options, withCustomView, () => {});
   instantiate(small, options, withCustomView, () => {});
-  assert.deepEqual(views[0], original);
-  assert.deepEqual(createdNames, ['Backlog', 'Epics']);
+  assert.deepEqual(views.slice(0, 2), original);
+  assert.deepEqual(createdNames, ['Backlog']);
 });
 
 test('Epic and Size follow Title while other columns keep their relative order', () => {
@@ -1792,38 +2123,6 @@ test('Epic and Size follow Title while other columns keep their relative order',
   }
   instantiate(small, options, visible, () => {});
   instantiate(small, options, visible, () => {});
-  assert.equal(updates, 1);
-});
-
-test('Epics view shows Title and Epic and repairs missing Epic column once', () => {
-  const { small, run, options } = fixture({ existing: true });
-  let epicColumns = [{ id: 'title' }];
-  let updates = 0;
-  function epicsView(args, input) {
-    if (args[1] === 'graphql') {
-      const { query, variables } = JSON.parse(input);
-      if (query.includes('visibleFields(first: 100)')) {
-        const result = JSON.parse(run(args, input));
-        const view = result.data.node.views.nodes.find(
-          (candidate) => candidate.name === 'Epics',
-        );
-        view.configuration.visibleFields.nodes = epicColumns;
-        return JSON.stringify(result);
-      }
-      if (query.includes('visibleFieldIds:')) {
-        assert.deepEqual(variables.fields, ['title', 'epic']);
-        epicColumns = variables.fields.map((id) => ({ id }));
-        updates++;
-        return JSON.stringify({
-          data: { updateProjectV2View: { projectV2View: { id: 'epic-view' } } },
-        });
-      }
-    }
-    return run(args, input);
-  }
-  instantiate(small, options, epicsView, () => {});
-  instantiate(small, options, epicsView, () => {});
-  assert.deepEqual(epicColumns, [{ id: 'title' }, { id: 'epic' }]);
   assert.equal(updates, 1);
 });
 
@@ -2061,13 +2360,13 @@ test('Features and Bugs views are created and filtered once for each repository 
     }
     instantiate(small, options, filtered, () => {});
     instantiate(small, options, filtered, () => {});
-    assert.equal(creations, 3);
+    assert.equal(creations, 2);
     assert.deepEqual(
       views
         .slice(1)
         .map((view) => view.name)
         .sort(),
-      ['Bugs', 'Epics', 'Features'],
+      ['Bugs', 'Features'],
     );
     assert.deepEqual(
       filters,

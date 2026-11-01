@@ -13,10 +13,17 @@ organisation, ouvrez-le, puis choisissez **Code > Codespaces > Create codespace
 on [branche]**. Le Codespace s'ouvre directement sur votre fork.
 
 Le Codespace configure Node.js 24 et installe les dépendances à sa création.
-Dans le terminal, vérifiez que le CLI GitHub est connecté :
+Dans le terminal, passer les commandes suivante:
 
 ```sh
+# Vérifier le mode d’authentification
 gh auth status
+
+# Ne plus utiliser le jeton automatique du Codespace dans ce terminal
+unset GH_TOKEN GITHUB_TOKEN
+
+# S’authentifier avec ton compte et les droits Projects
+gh auth login --hostname github.com --web --scopes project
 ```
 
 Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Si les dépendances
@@ -35,8 +42,8 @@ réellement y créer le backlog. Remplacez `MON_DEPOT`, puis lancez d'abord une
 simulation et l'import :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
-npm run backlog:instantiate -- --repo MON_DEPOT --apply
+npm run backlog:instantiate -- --repo themoviedb-discovery-app --dry-run
+npm run backlog:instantiate -- --repo themoviedb-discovery-app --apply
 ```
 
 Par défaut, `--apply` synchronise des **brouillons GitHub Projects** sans créer
@@ -44,10 +51,16 @@ d'issues. Leur identité repose sur les clés stables du YAML. La création
 d'issues doit être demandée explicitement avec `--create-issues --apply`.
 `--prune` nécessite aussi `--create-issues` ; il ne supprime pas les brouillons.
 
+Les vues **Backlog backend** et **Backlog frontend** sont configurées lorsque
+le champ `scope` existe. Elles filtrent les tickets par périmètre, avec les
+mêmes colonnes que Backlog, en mode brouillons comme en mode issues.
+
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
-avant d'utiliser `--apply`, qui crée réellement les issues et le projet.
-Pour reprendre un projet existant, ajoutez `--project-number NUMERO` comme
-expliqué ci-dessous.
+avant d'utiliser `--apply`, qui applique la configuration au projet GitHub et
+peut créer un projet ou des tickets selon les options. Sans
+`--project-number`, le script réutilise le projet ouvert dont le titre
+correspond au backlog et au dépôt, s'il existe ; sinon il le crée. Pour choisir
+un autre projet sans ambiguïté, ajoutez `--project-number NUMERO`.
 
 ## Installation et utilisation
 
@@ -82,12 +95,29 @@ Pour reprendre le même projet, conserver son numéro :
 npm run backlog:instantiate -- --repo MON_DEPOT --project-number NUMERO --apply
 ```
 
-Sans numéro, `--apply` crée un nouveau projet. Les relances ne dupliquent pas
-les issues et conservent leur avancement. L'option `--update-existing` remplace
-explicitement leurs titres et descriptions, y compris les modifications
-manuelles, mais conserve les commentaires et champs déjà renseignés.
+Sans numéro, `--apply` recherche un projet ouvert portant le titre généré pour
+le backlog et le dépôt, puis le réutilise ; s'il n'en trouve pas, il crée le
+projet. Si plusieurs projets portent ce titre, préciser `--project-number`.
+Les relances ne dupliquent pas les issues et conservent leur avancement.
+L'option `--update-existing` remplace explicitement les titres et descriptions
+des issues existantes, y compris les modifications manuelles, mais conserve
+les commentaires et champs déjà renseignés.
 `--config chemin/backlog.yaml` permet de fournir une autre configuration.
 La simulation sans `--prune` est locale et n'effectue aucun appel GitHub.
+
+Pour prendre le YAML comme référence et remplacer les valeurs déjà renseignées :
+
+```sh
+npm run backlog:instantiate -- --repo themoviedb-discovery-app --force-update --apply
+```
+
+`--force-update` synchronise les titres, descriptions, Size, Priority, Epic,
+scope déclaré et, en mode issues, le milestone déclaré et le type Feature/Bug.
+Il conserve le statut, les valeurs absentes du YAML, les champs non gérés et
+les commentaires. Il fonctionne avec les brouillons et les issues ; il ne
+crée pas d'issues sans `--create-issues`. Sans cette option, les champs déjà
+renseignés restent conservés. `--force-update --dry-run` reste local et avertit
+des remplacements, sans comparer les valeurs présentes sur GitHub.
 
 Pour nettoyer les issues générées retirées du YAML, utiliser `--prune` avec
 `--project-number NUMERO`. Avec `--dry-run`, cette option consulte GitHub sans
