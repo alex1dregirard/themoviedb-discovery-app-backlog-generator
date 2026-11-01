@@ -1190,6 +1190,202 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   instantiate(f.small, draftOptions, drafts, () => {});
   assert.equal(mutations.length, 1);
   assert.ok(items[0].content.title.includes('Updated draft'));
+  const originalRun = drafts;
+  const edits = [];
+  const forceRun = (args, input) => {
+    if (args[1] === 'item-edit') {
+      const field = args[args.indexOf('--field-id') + 1];
+      const name = {
+        size: 'Size',
+        epic: 'Epic',
+        priority: 'Priority',
+        scope: 'scope',
+      }[field];
+      assert.ok(name, 'Existing status must be preserved');
+      const value = items[0].fieldValues.nodes.find(
+        (value) => value.field.name === name,
+      );
+      value.name = args[args.indexOf('--single-select-option-id') + 1];
+      edits.push(name);
+      return '';
+    }
+    return originalRun(args, input);
+  };
+  delete draftOptions['update-existing'];
+  draftOptions['force-update'] = true;
+  const ticket = f.small.epics[0].tickets[0];
+  ticket.title = 'Forced title';
+  ticket.priority = 'P2';
+  ticket.size = 'L';
+  ticket.scope = 'backend';
+  instantiate(f.small, draftOptions, forceRun, () => {});
+  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Size', 'scope']);
+  assert.ok(items[0].content.title.includes('Forced title'));
+  const count = edits.length;
+  instantiate(f.small, draftOptions, forceRun, () => {});
+  assert.equal(edits.length, count);
+  delete ticket.scope;
+  instantiate(f.small, draftOptions, forceRun, () => {});
+  assert.equal(edits.length, count);
+  assert.equal(
+    items[0].fieldValues.nodes.find((value) => value.field.name === 'scope')
+      .name,
+    'backend',
+  );
+});
+
+test('force-update synchronizes issue content and declared fields, preserving status and absent values', () => {
+  const f = fixture({ existing: true, scope: 'backend' });
+  const ticket = f.small.epics[0].tickets[0];
+  ticket.priority = 'P2';
+  ticket.size = 'L';
+  ticket.milestone = '2.0.0';
+  f.small.milestones = [{ title: '2.0.0' }];
+  const existing = {
+    number: 1,
+    html_url: 'https://github.com/student/movies/issues/1',
+    title: 'Manual title',
+    body: marker(ticket.id),
+    milestone: { number: 9 },
+    type: { name: 'Bug' },
+    state: 'closed',
+  };
+  const nodes = ['Status', 'Size', 'Epic', 'Priority', 'scope', 'Custom'].map(
+    (name) => ({
+      field: { name },
+      name: 'manual',
+    }),
+  );
+  const edits = [];
+  const patches = [];
+  const run = (args, input) => {
+    if (args[1].includes('/issues?')) return JSON.stringify([[existing]]);
+    if (args[1].includes('/milestones?'))
+      return JSON.stringify([[{ title: '2.0.0', number: 5 }]]);
+    if (args.includes('PATCH')) {
+      const patch = JSON.parse(input);
+      patches.push(patch);
+      if (patch.milestone) existing.milestone = { number: patch.milestone };
+      if (patch.type) existing.type = { name: patch.type };
+      if (patch.title) Object.assign(existing, patch);
+      return '{}';
+    }
+    if (
+      args[1] === 'graphql' &&
+      JSON.parse(input).query.includes('items(first:')
+    ) {
+      const result = JSON.parse(f.run(args, input));
+      result.data.node.items.nodes[0].fieldValues.nodes = nodes;
+      return JSON.stringify(result);
+    }
+    if (args[1] === 'item-edit') {
+      const field = args[args.indexOf('--field-id') + 1];
+      const name = {
+        size: 'Size',
+        epic: 'Epic',
+        priority: 'Priority',
+        scope: 'scope',
+      }[field];
+      assert.ok(name, 'Status and custom fields must not be overwritten');
+      nodes.find((entry) => entry.field.name === name).name =
+        args[args.indexOf('--single-select-option-id') + 1];
+      edits.push(name);
+      return '';
+    }
+    return f.run(args, input);
+  };
+  const options = { ...f.options, 'force-update': true };
+  instantiate(f.small, options, run, () => {});
+  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Size', 'scope']);
+  assert.equal(existing.milestone.number, 5);
+  assert.equal(existing.type.name, 'Feature');
+  assert.equal(existing.title, `[${ticket.id}] ${ticket.title}`);
+  assert.ok(existing.body.includes('Taille : L'));
+  assert.equal(existing.state, 'closed');
+  assert.equal(
+    nodes.find((entry) => entry.field.name === 'Status').name,
+    'manual',
+  );
+  const count = patches.length;
+  instantiate(f.small, options, run, () => {});
+  assert.equal(patches.length, count);
+  assert.equal(edits.length, 4);
+  delete ticket.scope;
+  delete ticket.milestone;
+  instantiate(f.small, options, run, () => {});
+  assert.equal(existing.milestone.number, 5);
+  assert.equal(
+    nodes.find((entry) => entry.field.name === 'scope').name,
+    'backend',
+  );
+  assert.equal(edits.length, 4);
+});
+
+test('force-update simulation stays local and warns about overwrites', () => {
+  const options = parseOptions([
+    '--repo',
+    'movies',
+    '--force-update',
+    '--dry-run',
+  ]);
+  assert.equal(options['force-update'], true);
+  const output = [];
+  instantiate(
+    config,
+    options,
+    () => assert.fail('Unexpected GitHub call'),
+    (line) => output.push(line),
+  );
+  assert.ok(output.some((line) => line.includes('modifications manuelles')));
+  assert.ok(output.some((line) => line.includes('statut')));
+});
+
+test('force-update removes only the opposite type label in a personal repository', () => {
+  const f = fixture({ existing: true });
+  const ticket = f.small.epics[0].tickets[0];
+  const existing = {
+    number: 1,
+    html_url: 'https://github.com/student/movies/issues/1',
+    title: `[${ticket.id}] ${ticket.title}`,
+    body: issueBody(f.small.epics[0], ticket, f.small, new Map()),
+    labels: [{ name: 'feature' }, { name: 'BUG' }, { name: 'custom' }],
+  };
+  const removed = [];
+  const run = (args, input) => {
+    if (args[1] === 'repos/student/movies')
+      return JSON.stringify({ owner: { type: 'User' } });
+    if (args[1].includes('/issues?')) return JSON.stringify([[existing]]);
+    if (args[1].includes('/labels?'))
+      return JSON.stringify([[{ name: 'feature' }]]);
+    if (args.includes('DELETE')) {
+      assert.equal(args[1], 'repos/student/movies/issues/1/labels/BUG');
+      removed.push('BUG');
+      existing.labels = existing.labels.filter((label) => label.name !== 'BUG');
+      return '{}';
+    }
+    return f.run(args, input);
+  };
+  const options = { ...f.options, 'force-update': true };
+  instantiate(f.small, options, run, () => {});
+  instantiate(f.small, options, run, () => {});
+  assert.deepEqual(removed, ['BUG']);
+  assert.deepEqual(existing.labels, [{ name: 'feature' }, { name: 'custom' }]);
+});
+
+test('force-update surfaces field update failures without a success summary', () => {
+  const f = fixture({ existing: true, failEdit: true });
+  const output = [];
+  assert.throws(
+    () =>
+      instantiate(
+        f.small,
+        { ...f.options, 'force-update': true },
+        f.run,
+        (line) => output.push(line),
+      ),
+    /Permission refusee/,
+  );
+  assert.ok(!output.some((line) => line.includes('tickets presents')));
 });
 
 test('apply creates issues and assigns Backlog, size, epic and priority', () => {

@@ -253,6 +253,24 @@ uniquement Epic et Size aux colonnes visibles si nécessaire.
 
 ### Reprendre un import ou utiliser un projet existant
 
+Pour synchroniser aussi les valeurs existantes à partir du YAML, utiliser
+`--force-update --apply`. Cette option remplace les titres et descriptions,
+Size, Priority, Epic et scope lorsqu'il est déclaré. En mode issues, elle
+remplace aussi le milestone déclaré et synchronise le type Feature/Bug ;
+dans un dépôt personnel, le label de type opposé est retiré, sans toucher
+aux autres labels. Les brouillons n'ont pas de milestone ni de type natif.
+Le statut, les valeurs absentes du YAML, les champs non gérés et les
+commentaires sont conservés. Une valeur déjà conforme n'est pas réécrite.
+Sans `--force-update`, les champs existants restent conservés ; `--update-existing`
+continue de ne remplacer que les titres et descriptions.
+
+```sh
+npm run backlog:instantiate -- --repo MON_DEPOT --force-update --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --force-update --apply
+```
+
+La simulation reste locale : elle avertit des remplacements sans consulter GitHub.
+
 La création affiche immédiatement l'URL et le numéro du projet, ainsi que la
 commande de reprise. Conserver ce numéro :
 

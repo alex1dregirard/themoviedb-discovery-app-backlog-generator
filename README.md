@@ -105,6 +105,20 @@ les commentaires et champs déjà renseignés.
 `--config chemin/backlog.yaml` permet de fournir une autre configuration.
 La simulation sans `--prune` est locale et n'effectue aucun appel GitHub.
 
+Pour prendre le YAML comme référence et remplacer les valeurs déjà renseignées :
+
+```sh
+npm run backlog:instantiate -- --repo themoviedb-discovery-app --force-update --apply
+```
+
+`--force-update` synchronise les titres, descriptions, Size, Priority, Epic,
+scope déclaré et, en mode issues, le milestone déclaré et le type Feature/Bug.
+Il conserve le statut, les valeurs absentes du YAML, les champs non gérés et
+les commentaires. Il fonctionne avec les brouillons et les issues ; il ne
+crée pas d'issues sans `--create-issues`. Sans cette option, les champs déjà
+renseignés restent conservés. `--force-update --dry-run` reste local et avertit
+des remplacements, sans comparer les valeurs présentes sur GitHub.
+
 Pour nettoyer les issues générées retirées du YAML, utiliser `--prune` avec
 `--project-number NUMERO`. Avec `--dry-run`, cette option consulte GitHub sans
 écriture et affiche les issues concernées. Avec `--apply`, elle les ferme et
