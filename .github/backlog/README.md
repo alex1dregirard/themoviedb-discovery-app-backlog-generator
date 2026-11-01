@@ -33,59 +33,69 @@ l'évolution historique des notes ou de la popularité : ces valeurs sont celles
 observées à la collecte. Une collecte plafonnée reste un échantillon, pas un
 recensement exhaustif.
 
-| Ticket  | Livraison attendue                                 | Taille | Prérequis        |
-| ------- | -------------------------------------------------- | ------ | ---------------- |
-| EXPL-01 | Spécification fournie des données et relations     | S      | Aucun            |
-| EXPL-02 | Mise en place du schéma SQLite spécifié            | M      | EXPL-01          |
-| EXPL-03 | Base locale et migrations                          | M      | EXPL-02          |
-| EXPL-04 | CLI d'initialisation et chemin configurable        | S      | EXPL-03          |
-| EXPL-05 | Import CSV et entretien des genres                 | M      | EXPL-04          |
-| EXPL-06 | Import CSV et entretien des pays de production     | M      | EXPL-05          |
-| EXPL-07 | Route Discover paginée par année                   | M      | EXPL-01          |
-| EXPL-08 | Extraction TMDB par année et pagination            | L      | EXPL-01, EXPL-07 |
-| EXPL-09 | Nettoyage et contrôles de qualité                  | M      | EXPL-01, EXPL-08 |
-| EXPL-10 | Chargement idempotent et suivi des exécutions      | L      | EXPL-03, EXPL-09 |
-| EXPL-11 | CLI de pilotage et simulation                      | M      | EXPL-04, EXPL-10 |
-| EXPL-12 | API de lecture et agrégations                      | L      | EXPL-10          |
-| EXPL-13 | Page, filtres et tableau paginé                    | M      | EXPL-12          |
-| EXPL-14 | Visualisations et interprétation                   | L      | EXPL-13          |
-| EXPL-15 | Démonstration reproductible et tests d'intégration | M      | EXPL-11, EXPL-14 |
+| Ticket      | Livraison attendue                                 | Taille | Prérequis                |
+| ----------- | -------------------------------------------------- | ------ | ------------------------ |
+| DATABASE-01 | Spécification fournie des données et relations     | S      | Aucun                    |
+| DATABASE-02 | Mise en place du schéma SQLite spécifié            | M      | DATABASE-01              |
+| DATABASE-03 | Base locale et migrations                          | M      | DATABASE-02              |
+| DATABASE-04 | CLI d'initialisation et chemin configurable        | S      | DATABASE-03              |
+| DATABASE-05 | Import CSV et entretien des genres                 | M      | DATABASE-04              |
+| DATABASE-06 | Import CSV et entretien des pays de production     | M      | DATABASE-05              |
+| DATABASE-07 | Route Discover paginée par année                   | M      | DATABASE-01              |
+| DATABASE-08 | Extraction TMDB par année et pagination            | L      | DATABASE-01, DATABASE-07 |
+| DATABASE-09 | Nettoyage et contrôles de qualité                  | M      | DATABASE-01, DATABASE-08 |
+| DATABASE-10 | Chargement idempotent et suivi des exécutions      | L      | DATABASE-03, DATABASE-09 |
+| DATABASE-11 | CLI de pilotage et simulation                      | M      | DATABASE-04, DATABASE-10 |
+| DATABASE-12 | API de lecture et agrégations                      | L      | DATABASE-10              |
+| DATABASE-13 | Page, filtres et tableau paginé                    | M      | DATABASE-12              |
+| DATABASE-14 | Visualisations et interprétation                   | L      | DATABASE-13              |
+| DATABASE-15 | Démonstration reproductible et tests d'intégration | M      | DATABASE-11, DATABASE-14 |
 
-EXPL-04, EXPL-05 et EXPL-06 spécifient respectivement les apports des PR
+DATABASE-04, DATABASE-05 et DATABASE-06 spécifient respectivement les apports des PR
 [#50](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/50),
 [#51](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/51) et
 [#52](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/52).
 Ces PR contiennent aussi le socle des précédentes : les tickets distinguent
 leurs apports pour éviter de redemander les mêmes développements.
-EXPL-07 décrit la route Discover de la
+DATABASE-07 décrit la route Discover de la
 [#56](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/56) :
 une seule page pour une année de sortie principale, sans collecte automatique,
 enrichissement par le détail ni stockage.
-Les anciens EXPL-04 à EXPL-11 deviennent EXPL-08 à EXPL-15 ; leurs clés stables
+Les anciens EXPL-04 à EXPL-11 correspondent à DATABASE-08 à DATABASE-15 ; leurs clés stables
 conservent leurs issues et leur suivi. Les nouveaux tickets ont des clés
 distinctes pour ne pas reprendre les anciennes issues portant ces numéros.
 Relancer avec `--update-existing --apply` pour actualiser les titres et les
 dépendances des issues déjà importées.
 
-EXPL-01 décrit le besoin d'exploration, le parcours Discover puis détail d'un film
+L'epic EXPL est renommée DATABASE. Les identifiants affichés et les dépendances
+utilisent DATABASE ; les clés stables `EXPL-*` restent inchangées pour retrouver
+les mêmes issues et conserver leur historique. Dans un projet existant, renommer
+l'option EXPL du champ Epic en DATABASE avant l'import conserve les rattachements.
+
+DATABASE-01 décrit le besoin d'exploration, le parcours Discover puis détail d'un film
 et un dictionnaire des données brutes avec leur provenance dans l'API TMDB.
 Les liens entre films, genres et pays sont expliqués par des règles métier et
 des exemples, sans fournir les entités ni le MCD. Les étudiants en déduisent
-eux-mêmes le MCD dans EXPL-02, puis le traduisent en schéma SQLite.
+eux-mêmes le MCD dans DATABASE-02, puis le traduisent en schéma SQLite.
 Le suivi détaillé des exécutions des étapes suivantes reste une extension distincte.
 
-Dans EXPL-01, l'année de sortie est une information dérivée de la date de sortie,
+Dans DATABASE-01, l'année de sortie est une information dérivée de la date de sortie,
 et non l'année demandée au collecteur. Une date absente ou inexploitable laisse
 l'année inconnue ; le film reste au catalogue mais ne participe pas aux
-regroupements par année. EXPL-02 choisit de traduire cette règle par une colonne
+regroupements par année. DATABASE-02 choisit de traduire cette règle par une colonne
 SQLite générée et stockée, avec les tests du calcul, de sa mise à jour automatique
 et de l'interdiction d'écrire directement cette colonne.
 
-EXPL-03 et EXPL-07 peuvent avancer en parallèle après leurs prérequis.
+DATABASE-03 et DATABASE-07 peuvent avancer en parallèle après leurs prérequis.
 Chaque ticket possède ses critères d'acceptation ; le
 champ Epic du projet associe les tickets à cette évolution, sans créer d'issue
 parent supplémentaire. Ce backlog décrit le travail futur, il n'implémente pas
 encore la base, le CLI ni le tableau de bord.
+
+Chaque ticket définit sa propre **Definition of Done** dans la liste obligatoire
+`definitionOfDone` du YAML. Elle décrit les vérifications et livrables nécessaires
+pour terminer ce ticket, distincts de ses critères d'acceptation. Le générateur
+la rend sous forme de cases à cocher, sans liste globale ni valeur par défaut.
 
 La configuration `project.typeViews` définit deux vues supplémentaires :
 **Features** et **Bugs**. Elles sont filtrées respectivement avec `type:Feature`
@@ -98,20 +108,20 @@ sont visibles dans Epics.
 
 ### Estimer en tailles de T-shirt
 
-| Taille | Poids relatif initial | Repère pour la discussion                                        |
-| ------ | --------------------- | ---------------------------------------------------------------- |
-| XS     | 1                     | Changement très local, peu d'incertitude                         |
-| S      | 2                     | Petite fonctionnalité, périmètre clair                           |
-| M      | 3                     | Plusieurs composants ou transformations à coordonner             |
-| L      | 5                     | Fonctionnalité plus large, intégration ou incertitude importante |
-| XL     | 8                     | Trop large ou trop incertain : découper avant le sprint          |
+| Taille | Repère pour la discussion                                        |
+| ------ | ---------------------------------------------------------------- |
+| XS     | Changement très local, peu d'incertitude                         |
+| S      | Petite fonctionnalité, périmètre clair                           |
+| M      | Plusieurs composants ou transformations à coordonner             |
+| L      | Fonctionnalité plus large, intégration ou incertitude importante |
+| XL     | Trop large ou trop incertain : découper avant le sprint          |
 
 Ces tailles évaluent **l'effort relatif, la complexité et l'incertitude**, pas des
-heures. Les poids sont une convention pédagogique, pas une mesure universelle :
-ils ne servent ni à noter les étudiants ni à comparer les équipes. Les
+heures. Elles ne servent ni à noter les étudiants ni à comparer les équipes. Les
 estimations proposées sont un point de départ à **réestimer collectivement**.
-Après une réestimation dans GitHub, ajuster Size et Weight ensemble pour conserver
-la correspondance choisie par l'équipe.
+Après une réestimation dans GitHub, ajuster uniquement le champ Size.
+Le générateur ne crée ni ne renseigne de champ numérique Weight ; un ancien
+champ Weight peut être supprimé manuellement dans les paramètres du projet.
 
 La propriété `color` de chaque taille définit sa couleur GitHub : **XS vert,
 S bleu, M jaune, L orange, XL rouge**. Le générateur applique cette palette à
@@ -166,7 +176,7 @@ npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --apply
 ```
 
 Le script crée un GitHub Project lié au dépôt, les issues et les champs :
-**Status**, **Size**, **Weight**, **Epic** et **Priority**. Tous les nouveaux
+**Status**, **Size**, **Epic** et **Priority**. Tous les nouveaux
 tickets sont initialisés dans **Backlog**. Le champ Status propose ensuite
 **Ready**, **In Progress**, **In Review** et **Done**. Les dépendances sont des
 liens dans les descriptions des issues, pas des blocages natifs GitHub.
@@ -249,7 +259,7 @@ même avec `--update-existing`. Omettre ou retirer cette propriété ne détache
 jamais un ticket de sa version. Les erreurs de permission arrêtent l'import.
 
 La configuration fournie crée **1.1.0** et y rattache les trois premiers tickets,
-**EXPL-01**, **EXPL-02** et **EXPL-03**. L'équipe peut ajuster le périmètre des
+**DATABASE-01**, **DATABASE-02** et **DATABASE-03**. L'équipe peut ajuster le périmètre des
 versions suivantes pendant la planification.
 Une milestone regroupe un objectif de livraison, tandis que le statut du projet
 décrit l'avancement des tickets.
@@ -278,11 +288,34 @@ identifiants, couleurs et descriptions des options existantes.
 
 Une nouvelle relance sans modification ne crée aucun doublon. Les tickets déjà
 en cours ou terminés, leurs contenus, leurs estimations et les options ajoutées
-par l'équipe restent intacts. Retirer une idée du fichier ne supprime rien dans
+par l'équipe restent intacts. Sans `--prune`, retirer une idée du fichier ne supprime rien dans
 GitHub. Modifier un ticket existant dans le fichier ne remplace pas son contenu
 sur GitHub : utiliser un nouvel identifiant pour un nouveau besoin, ou modifier
 l'issue manuellement pour préciser le besoin initial, ou utiliser la mise à jour
 explicite ci-dessous.
+
+### Nettoyer les tickets retirés du backlog
+
+`--prune` exige un `--project-number` explicite. Il ferme les issues générées
+absentes du YAML et les retire du projet ciblé, sans suppression définitive.
+Les issues manuelles, les pull requests, les issues hors de ce projet et celles
+dont la clé stable existe encore dans le YAML sont conservées. Une issue avec
+plusieurs marqueurs est conservée par précaution. Les autres projets ne sont
+pas modifiés, mais la fermeture de l'issue reste visible partout.
+
+```sh
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --prune --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --prune --apply
+```
+
+Contrairement à la simulation ordinaire, la simulation avec `--prune` consulte
+GitHub pour afficher les issues concernées, sans écriture. Avec `--apply`, le
+nettoyage intervient après l'import et les éventuelles mises à jour. Une erreur
+arrête le traitement ; les opérations déjà effectuées restent appliquées et
+une relance reprend le nettoyage. Les commentaires et l'historique des issues
+fermées sont conservés. Vérifier le résultat simulé et les clés stables avant
+application : modifier une clé peut faire considérer son ancienne issue comme
+obsolète.
 
 ### Mettre à jour le contenu des tickets existants
 
@@ -298,13 +331,13 @@ npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --proje
 contenu diffère de la configuration**, y compris les modifications manuelles et
 les cases cochées dans la description. Prévenir les étudiants avant de l'utiliser.
 Les commentaires, affectations, labels, état ouvert/fermé et champs déjà
-renseignés du projet restent conservés, notamment l'avancement, Size et Weight.
+renseignés du projet restent conservés, notamment l'avancement et Size.
 Les estimations affichées dans la description restent les estimations initiales
 de la configuration, pas celles réévaluées dans les champs du projet.
 
 Les liens de dépendances sont reconstruits après création des nouveaux tickets.
 Les contenus identiques ne sont pas réécrits. Sans cette option, la relance reste
-strictement additive pour les titres et descriptions. La simulation ne consulte
+strictement additive pour les titres et descriptions. La simulation sans `--prune` ne consulte
 pas GitHub et ne détermine donc pas quelles issues ont changé.
 
 ## Proposition d'atelier agile
@@ -325,8 +358,8 @@ pas GitHub et ne détermine donc pas quelles issues ont changé.
 6. **Rétrospective** : comparer ce qui a été prévu et livré, discuter les
    incertitudes et ajuster le découpage et les estimations du sprint suivant.
 
-Pour une première itération, lire la spécification **EXPL-01**, puis réaliser le
-schéma **EXPL-02** et discuter le contrat d'extraction **EXPL-08**. Construire ensuite un petit
+Pour une première itération, lire la spécification **DATABASE-01**, puis réaliser le
+schéma **DATABASE-02** et discuter le contrat d'extraction **DATABASE-08**. Construire ensuite un petit
 incrément de bout en bout sur une période limitée avant d'élargir la collecte.
 Les tailles restent à réestimer ; découper les tickets L si nécessaire pour
 tenir l'objectif du sprint.

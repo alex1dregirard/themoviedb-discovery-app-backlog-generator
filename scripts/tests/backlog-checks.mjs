@@ -38,6 +38,7 @@ const config = {
             ? [`WATCH-0${number - 1}`]
             : [],
       acceptance: ['Un resultat observable est verifie.'],
+      definitionOfDone: ['Le resultat du ticket est relu et demontre.'],
       ...(id === 'BUG'
         ? { reproduction: ['Declencher le defaut et observer le resultat.'] }
         : {}),
@@ -52,6 +53,55 @@ test('backlog accepts a growing set of ideas with unique tickets', () => {
     new Set(tickets.map((ticket) => ticket.id)).size,
     tickets.length,
   );
+});
+
+test('DATABASE preserves the stable keys of the former EXPL issues', () => {
+  const epic = configuredBacklog.epics.find(
+    (candidate) => candidate.id === 'DATABASE',
+  );
+  assert.ok(epic);
+  assert.deepEqual(
+    epic.tickets.map((ticket) => ticket.key),
+    [
+      'EXPL-01',
+      'EXPL-02',
+      'EXPL-CLI-INIT',
+      'EXPL-GENRES-CSV',
+      'EXPL-COUNTRIES-CSV',
+      'EXPL-DISCOVER-API',
+      ...Array.from(
+        { length: 8 },
+        (_, index) => `EXPL-${String(index + 4).padStart(2, '0')}`,
+      ),
+    ],
+  );
+  for (const ticket of epic.tickets) {
+    assert.ok(ticket.id.startsWith('DATABASE-'));
+    assert.ok(ticket.dependsOn.every((id) => id.startsWith('DATABASE-')));
+  }
+});
+
+test('each ticket requires its own nonempty Definition of Done', () => {
+  for (const definitionOfDone of [undefined, null, [], [''], [' '], [42]]) {
+    const invalid = structuredClone(config);
+    invalid.epics[0].tickets[0].definitionOfDone = definitionOfDone;
+    assert.throws(() => validateBacklog(invalid), /Definition of Done/);
+  }
+  const epic = config.epics[0];
+  const first = {
+    ...epic.tickets[0],
+    definitionOfDone: ['Premier livrable verifie.'],
+  };
+  const second = {
+    ...epic.tickets[1],
+    definitionOfDone: ['Second livrable demontre.'],
+  };
+  const firstBody = issueBody(epic, first, config, new Map());
+  const secondBody = issueBody(epic, second, config, new Map());
+  assert.ok(firstBody.includes('- [ ] Premier livrable verifie.'));
+  assert.ok(!firstBody.includes('Second livrable demontre.'));
+  assert.ok(secondBody.includes('- [ ] Second livrable demontre.'));
+  assert.ok(!secondBody.includes('Premier livrable verifie.'));
 });
 
 test('milestones are optional, unique and referenced by title', () => {
@@ -191,8 +241,8 @@ test('invalid sizing, priorities, stories and criteria are rejected', () => {
     assert.throws(() => validateBacklog(invalid));
   }
   const invalid = structuredClone(config);
-  invalid.sizes[1].weight = invalid.sizes[0].weight;
-  assert.throws(() => validateBacklog(invalid), /poids/);
+  invalid.sizes[1].color = 'INVALID';
+  assert.throws(() => validateBacklog(invalid), /couleurs/);
 });
 
 test('unknown dependencies, duplicated identifiers and cycles are rejected', () => {
@@ -399,7 +449,169 @@ test('simulation performs no GitHub calls and displays every ticket in Backlog',
   );
 });
 
-test('issue body includes story, size, weight, criteria, dependency URLs and Done', () => {
+test('prune requires an existing project number', () => {
+  assert.throws(
+    () => parseOptions(['--repo', 'movies', '--prune']),
+    /--project-number/,
+  );
+});
+
+test('prune only closes obsolete generated issues in the targeted project and is repeatable', () => {
+  for (const apply of [false, true]) {
+    const f = fixture({ existing: true });
+    const obsolete = {
+      number: 99,
+      body: marker('OLD-01'),
+      state: 'open',
+      html_url: 'https://github.com/student/movies/issues/99',
+    };
+    const alreadyClosed = {
+      ...obsolete,
+      number: 98,
+      state: 'closed',
+      body: marker('OLD-02'),
+      html_url: 'https://github.com/student/movies/issues/98',
+    };
+    const unrelated = {
+      ...obsolete,
+      number: 97,
+      body: 'Manual issue',
+      html_url: 'manual',
+    };
+    const outside = {
+      ...obsolete,
+      number: 96,
+      body: marker('OLD-03'),
+      html_url: 'outside',
+    };
+    const ambiguous = {
+      ...obsolete,
+      number: 95,
+      body: `${marker('OLD-04')}\n${marker('OLD-05')}`,
+      html_url: 'ambiguous',
+    };
+    const items = new Map(
+      [obsolete, alreadyClosed, unrelated, ambiguous].map((issue) => [
+        issue.html_url,
+        {
+          id: `item-${issue.number}`,
+          content: { url: issue.html_url },
+          fieldValues: { nodes: [] },
+        },
+      ]),
+    );
+    const writes = [];
+    const run = (args, input) => {
+      if (args[1]?.includes('/issues?')) {
+        const original = JSON.parse(f.run(args, input)).flat();
+        return JSON.stringify([
+          original,
+          [obsolete, alreadyClosed, unrelated, outside, ambiguous],
+        ]);
+      }
+      if (
+        args.includes('PATCH') &&
+        args[1] === 'repos/student/movies/issues/99'
+      ) {
+        writes.push('close');
+        obsolete.state = 'closed';
+        assert.deepEqual(JSON.parse(input), { state: 'closed' });
+        return JSON.stringify(obsolete);
+      }
+      if (args[1] === 'graphql') {
+        const { query, variables } = JSON.parse(input);
+        if (query.includes('deleteProjectV2Item')) {
+          writes.push(variables.item);
+          const entry = [...items].find(
+            ([, item]) => item.id === variables.item,
+          );
+          assert.ok(entry);
+          items.delete(entry[0]);
+          return JSON.stringify({
+            data: { deleteProjectV2Item: { deletedItemId: variables.item } },
+          });
+        }
+        if (query.includes('items(first: 100')) {
+          const original = JSON.parse(f.run(args, input));
+          original.data.node.items.nodes.push(...items.values());
+          return JSON.stringify(original);
+        }
+      }
+      return f.run(args, input);
+    };
+    const output = [];
+    const options = { ...f.options, apply, prune: true, 'project-number': '7' };
+    instantiate(f.small, options, run, (line) => output.push(line));
+    assert.deepEqual(writes, apply ? ['close', 'item-99', 'item-98'] : []);
+    assert.ok(output.some((line) => line.includes('2 ticket(s)')));
+    assert.ok(items.has('manual') && items.has('ambiguous'));
+    if (apply) {
+      instantiate(f.small, options, run, () => {});
+      assert.equal(writes.length, 3);
+    } else {
+      assert.ok(
+        !f.calls.some(
+          ({ args }) => args.includes('POST') || args[1] === 'item-edit',
+        ),
+      );
+    }
+  }
+});
+
+test('prune surfaces closure failures before removing an issue from the project', () => {
+  const f = fixture();
+  let deleted = false;
+  const run = (args, input) => {
+    if (args[1]?.includes('/issues?'))
+      return JSON.stringify([
+        [
+          {
+            number: 99,
+            state: 'open',
+            body: marker('OLD-01'),
+            html_url: 'obsolete',
+          },
+        ],
+      ]);
+    if (args.includes('PATCH') && args[1]?.endsWith('/issues/99'))
+      throw new Error('Closure denied');
+    if (args[1] === 'graphql') {
+      const { query } = JSON.parse(input);
+      if (query.includes('deleteProjectV2Item')) deleted = true;
+      if (query.includes('items(first: 100'))
+        return JSON.stringify({
+          data: {
+            node: {
+              items: {
+                nodes: [
+                  {
+                    id: 'old',
+                    content: { url: 'obsolete' },
+                    fieldValues: { nodes: [] },
+                  },
+                ],
+                pageInfo: { hasNextPage: false },
+              },
+            },
+          },
+        });
+    }
+    return f.run(args, input);
+  };
+  assert.throws(
+    () =>
+      instantiate(
+        f.small,
+        { ...f.options, prune: true, 'project-number': '7' },
+        run,
+        () => {},
+      ),
+    /Closure denied/,
+  );
+  assert.equal(deleted, false);
+});
+
+test('issue body includes story, size, criteria, dependency URLs and Done without weights', () => {
   const epic = config.epics.find((candidate) => candidate.id === 'EXP');
   const ticket = epic.tickets[0];
   const body = issueBody(
@@ -412,7 +624,6 @@ test('issue body includes story, size, weight, criteria, dependency URLs and Don
     marker(ticket.id),
     ticket.story,
     '**Taille : S**',
-    '**Poids relatif : 2**',
     '- [ ]',
     'https://github.com/student/movies/issues/1',
     'Definition of Done',
@@ -420,6 +631,10 @@ test('issue body includes story, size, weight, criteria, dependency URLs and Don
   ]) {
     assert.ok(body.includes(text), text);
   }
+  assert.ok(body.includes(`## ${epic.title}\n\n${epic.objective}`));
+  assert.ok(body.indexOf(`## ${epic.title}`) < body.indexOf('## User story'));
+  assert.ok(!body.includes('## Epic'));
+  assert.ok(!body.includes('Poids'));
 });
 
 function fixture({
@@ -444,7 +659,6 @@ function fixture({
       name: 'Size',
       options: small.sizes.map((size) => ({ id: size.name, name: size.name })),
     },
-    { id: 'weight', name: 'Weight' },
     { id: 'epic', name: 'Epic', options: [{ id: 'WATCH', name: 'WATCH' }] },
     {
       id: 'priority',
@@ -627,7 +841,7 @@ function fixture({
   };
 }
 
-test('apply creates issues and assigns Backlog, size, weight, epic and priority', () => {
+test('apply creates issues and assigns Backlog, size, epic and priority', () => {
   const { small, calls, run, options } = fixture();
   instantiate(small, options, run, () => {});
   assert.equal(calls.filter(({ args }) => args.includes('POST')).length, 1);
@@ -635,11 +849,9 @@ test('apply creates issues and assigns Backlog, size, weight, epic and priority'
   assert.equal(JSON.parse(creation.input).type, 'Feature');
   assert.ok(!Object.hasOwn(JSON.parse(creation.input), 'labels'));
   const edits = calls.filter(({ args }) => args[1] === 'item-edit');
-  assert.equal(edits.length, 5);
+  assert.equal(edits.length, 4);
   assert.ok(edits.some(({ args }) => args.includes('backlog')));
-  assert.ok(
-    edits.some(({ args }) => args.includes('--number') && args.includes('2')),
-  );
+  assert.ok(edits.every(({ args }) => !args.includes('--number')));
   assert.ok(calls.some(({ input }) => input?.includes('updateProjectV2Field')));
 });
 
@@ -707,7 +919,6 @@ test('new project receives all custom fields with their expected types', () => {
     [...created],
     [
       ['Size', 'SINGLE_SELECT'],
-      ['Weight', 'NUMBER'],
       ['Epic', 'SINGLE_SELECT'],
       ['Priority', 'SINGLE_SELECT'],
     ],
@@ -796,21 +1007,21 @@ test('duplicate issue markers stop the import before creating a project', () => 
   assert.ok(!calls.some(({ args }) => args[0] === 'project'));
 });
 
-test('incompatible existing Weight field fails explicitly before issue creation', () => {
+test('legacy Weight fields are neither validated nor populated', () => {
   const { small, calls, run, options } = fixture({ existing: true });
   function incompatible(args, input) {
     const result = run(args, input);
+    if (args[1] === 'field-list') {
+      const data = JSON.parse(result);
+      data.fields.push({ id: 'legacy-weight', name: 'Weight' });
+      return JSON.stringify(data);
+    }
     if (input && JSON.parse(input).query?.includes('dataType'))
-      return JSON.stringify({ data: { node: { dataType: 'TEXT' } } });
+      assert.fail('Legacy Weight field must not be validated');
     return result;
   }
-  assert.throws(
-    () => instantiate(small, options, incompatible, () => {}),
-    /NUMBER/,
-  );
-  assert.ok(
-    !calls.some(({ args }) => args.includes('POST') || args[1] === 'item-edit'),
-  );
+  instantiate(small, options, incompatible, () => {});
+  assert.ok(!calls.some(({ args }) => args.includes('legacy-weight')));
 });
 
 test('regeneration adds new tickets and epics once without changing existing work', () => {
@@ -946,7 +1157,7 @@ test('regeneration adds new tickets and epics once without changing existing wor
   assert.ok(epic.options.some((option) => option.name === 'NEW'));
   assert.equal(
     mutations.filter((mutation) => mutation.type === 'edit').length,
-    10,
+    8,
   );
   const mutationCount = mutations.length;
   instantiate(small, options, evolving, () => {});

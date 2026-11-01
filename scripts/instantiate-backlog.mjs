@@ -10,7 +10,7 @@ const defaultConfig = new URL(
   '../.github/backlog/backlog.yaml',
   import.meta.url,
 );
-const fieldNames = ['Size', 'Weight', 'Epic', 'Priority'];
+const fieldNames = ['Size', 'Epic', 'Priority'];
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -48,9 +48,6 @@ export function validateBacklog(config) {
   requireValue(
     Array.isArray(config.sizes) &&
       config.sizes.map((size) => size.name).join(',') === 'XS,S,M,L,XL' &&
-      config.sizes.every(
-        (size) => Number.isInteger(size.weight) && size.weight > 0,
-      ) &&
       config.sizes.every((size) =>
         [
           'GRAY',
@@ -62,12 +59,8 @@ export function validateBacklog(config) {
           'PINK',
           'PURPLE',
         ].includes(size.color),
-      ) &&
-      config.sizes.every(
-        (size, index) =>
-          index === 0 || size.weight > config.sizes[index - 1].weight,
       ),
-    'Tailles attendues : XS,S,M,L,XL avec des poids entiers positifs croissants et des couleurs GitHub valides.',
+    'Tailles attendues : XS,S,M,L,XL avec des couleurs GitHub valides.',
   );
   requireValue(
     Array.isArray(config.epics) && config.epics.length > 0,
@@ -184,6 +177,14 @@ export function validateBacklog(config) {
         `${ticket.id} : criteres d'acceptation manquants.`,
       );
       requireValue(
+        Array.isArray(ticket.definitionOfDone) &&
+          ticket.definitionOfDone.length > 0 &&
+          ticket.definitionOfDone.every(
+            (criterion) => typeof criterion === 'string' && criterion.trim(),
+          ),
+        `${ticket.id} : Definition of Done manquante ou invalide.`,
+      );
+      requireValue(
         Array.isArray(ticket.dependsOn) &&
           ticket.dependsOn.every((id) => typeof id === 'string') &&
           new Set(ticket.dependsOn).size === ticket.dependsOn.length,
@@ -212,12 +213,13 @@ export function marker(id) {
 }
 
 export function issueBody(epic, ticket, config, issueUrls) {
-  const weight = config.sizes.find((size) => size.name === ticket.size).weight;
   const dependencies = ticket.dependsOn.length
     ? ticket.dependsOn.map((id) => `- ${issueUrls.get(id) ?? id}`).join('\n')
     : 'Aucune.';
   return [
     marker(ticket.key ?? ticket.id),
+    `## ${epic.title}`,
+    epic.objective,
     '## User story',
     ticket.story,
     ...(ticket.type === 'bug'
@@ -228,20 +230,15 @@ export function issueBody(epic, ticket, config, issueUrls) {
             .join('\n'),
         ]
       : []),
-    '## Objectif pédagogique',
-    `${epic.title} : ${epic.objective}`,
     '## Estimation initiale',
-    `**Taille : ${ticket.size}** | **Poids relatif : ${weight}** | **Priorité : ${ticket.priority}**`,
-    'Estimation indicative à discuter en refinement. Le poids ne représente ni des heures ni une note. Un ticket XL doit être découpé avant engagement en sprint.',
+    `**Taille : ${ticket.size}** | **Priorité : ${ticket.priority}**`,
+    'Estimation indicative à discuter en refinement. La taille ne représente ni des heures ni une note. Un ticket XL doit être découpé avant engagement en sprint.',
     "## Critères d'acceptation",
     ticket.acceptance.map((criterion) => `- [ ] ${criterion}`).join('\n'),
     '## Dépendances',
     dependencies,
     '## Definition of Done',
-    "- [ ] Critères d'acceptation vérifiés et démonstration préparée.",
-    '- [ ] Tests pertinents ajoutés ou adaptés et vérifications du projet réussies.',
-    '- [ ] Code relu et documentation utile mise à jour.',
-    '- [ ] Aucun secret ni donnée personnelle non nécessaire dans le dépôt.',
+    ticket.definitionOfDone.map((criterion) => `- [ ] ${criterion}`).join('\n'),
   ].join('\n\n');
 }
 
@@ -602,6 +599,7 @@ export function parseOptions(args) {
       apply: { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       'update-existing': { type: 'boolean', default: false },
+      prune: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
     },
   });
@@ -624,6 +622,10 @@ export function parseOptions(args) {
   requireValue(
     !values['project-number'] || /^[1-9]\d*$/.test(values['project-number']),
     '--project-number doit etre un entier positif.',
+  );
+  requireValue(
+    !values.prune || values['project-number'],
+    '--prune exige --project-number pour cibler un projet existant.',
   );
   return values;
 }
@@ -689,10 +691,88 @@ function readProjectItems(run, projectId) {
   return items;
 }
 
+function readRepositoryIssues(run, repo) {
+  return json(run, [
+    'api',
+    `repos/${repo}/issues?state=all&per_page=100`,
+    '--paginate',
+    '--slurp',
+  ])
+    .flat()
+    .filter((issue) => !issue.pull_request);
+}
+
+function pruneCandidates(config, issues, items) {
+  const keys = new Set(
+    config.epics.flatMap((epic) =>
+      epic.tickets.map((ticket) => ticket.key ?? ticket.id),
+    ),
+  );
+  return issues.filter((issue) => {
+    const markers = [
+      ...(issue.body ?? '').matchAll(
+        /<!-- tmdb-student-backlog:([A-Z][A-Z0-9-]*) -->/g,
+      ),
+    ];
+    return (
+      markers.length === 1 &&
+      !keys.has(markers[0][1]) &&
+      items.has(issue.html_url)
+    );
+  });
+}
+
+function pruneIssues(config, issues, items, projectId, run, log, apply) {
+  const candidates = pruneCandidates(config, issues, items);
+  for (const issue of candidates) {
+    log(`Prune : fermer et retirer du projet ${issue.html_url}`);
+    if (!apply) continue;
+    requireValue(
+      Number.isInteger(issue.number) && issue.number > 0,
+      'Numero d issue invalide pour --prune.',
+    );
+    const item = items.get(issue.html_url);
+    requireValue(
+      item.id,
+      'Identifiant de ticket du projet manquant pour --prune.',
+    );
+    if (issue.state !== 'closed')
+      run(
+        [
+          'api',
+          `repos/${config.repo}/issues/${issue.number}`,
+          '--method',
+          'PATCH',
+          '--input',
+          '-',
+        ],
+        JSON.stringify({ state: 'closed' }),
+      );
+    graphql(
+      run,
+      `
+        mutation ($project: ID!, $item: ID!) {
+          deleteProjectV2Item(input: { projectId: $project, itemId: $item }) {
+            deletedItemId
+          }
+        }
+      `,
+      { project: projectId, item: item.id },
+    );
+  }
+  log(
+    `Prune : ${candidates.length} ticket(s) ${apply ? 'retire(s)' : 'a retirer'}.`,
+  );
+}
+
 export function instantiate(config, options, run = gh, log = console.log) {
   validateBacklog(config);
+  requireValue(
+    !options.prune || options['project-number'],
+    '--prune exige --project-number pour cibler un projet existant.',
+  );
   const allTickets = config.epics.flatMap((epic) => epic.tickets);
-  if (!options.apply) {
+  if (!options.apply && !options.prune) {
     log(
       `Simulation : ${options.repo}${options.owner ? `, proprietaire ${options.owner}` : ''}, ${allTickets.length} tickets. Aucune requete GitHub.`,
     );
@@ -721,6 +801,30 @@ export function instantiate(config, options, run = gh, log = console.log) {
     );
     options.owner = user.login;
     options.repo = `${options.owner}/${options.repo}`;
+  }
+  if (options.prune && !options.apply) {
+    const project = json(run, [
+      'project',
+      'view',
+      options['project-number'],
+      '--owner',
+      options.owner,
+      '--format',
+      'json',
+    ]);
+    requireValue(project.id && !project.closed, 'Projet absent ou ferme.');
+    const issues = readRepositoryIssues(run, options.repo);
+    const items = readProjectItems(run, project.id);
+    pruneIssues(
+      { ...config, repo: options.repo },
+      issues,
+      items,
+      project.id,
+      run,
+      log,
+      false,
+    );
+    return;
   }
   const repository = json(run, [
     'repo',
@@ -766,15 +870,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
       ? 'Depot personnel : les types seront representes par des labels.'
       : 'Depot d organisation : types natifs Feature et Bug.',
   );
-  const issuePages = json(run, [
-    'api',
-    `repos/${options.repo}/issues?state=all&per_page=100`,
-    '--paginate',
-    '--slurp',
-  ]);
-  const existingIssues = issuePages
-    .flat()
-    .filter((issue) => !issue.pull_request);
+  const existingIssues = readRepositoryIssues(run, options.repo);
   const issueUrls = new Map();
   const issuesById = new Map();
   for (const ticket of allTickets) {
@@ -916,7 +1012,6 @@ export function instantiate(config, options, run = gh, log = console.log) {
   );
   const specifications = [
     { name: 'Size', values: config.sizes.map((size) => size.name) },
-    { name: 'Weight' },
     { name: 'Epic', values: config.epics.map((epic) => epic.id) },
     { name: 'Priority', values: ['P1', 'P2', 'P3'] },
   ];
@@ -933,31 +1028,12 @@ export function instantiate(config, options, run = gh, log = console.log) {
         '--name',
         specification.name,
         '--data-type',
-        specification.values ? 'SINGLE_SELECT' : 'NUMBER',
+        'SINGLE_SELECT',
       ];
-      if (specification.values)
-        args.push('--single-select-options', specification.values.join(','));
+      args.push('--single-select-options', specification.values.join(','));
       run(args);
-    } else if (specification.values) {
-      extendSelectField(run, field, specification.values, log);
     } else {
-      const data = graphql(
-        run,
-        `
-          query ($id: ID!) {
-            node(id: $id) {
-              ... on ProjectV2Field {
-                dataType
-              }
-            }
-          }
-        `,
-        { id: field.id },
-      );
-      requireValue(
-        data.node?.dataType === 'NUMBER',
-        'Le champ Weight doit etre de type NUMBER.',
-      );
+      extendSelectField(run, field, specification.values, log);
     }
   }
   fields = json(run, [
@@ -1133,7 +1209,6 @@ export function instantiate(config, options, run = gh, log = console.log) {
     const values = {
       Status: 'Backlog',
       Size: ticket.size,
-      Weight: config.sizes.find((size) => size.name === ticket.size).weight,
       Epic: epic.id,
       Priority: ticket.priority,
     };
@@ -1151,15 +1226,11 @@ export function instantiate(config, options, run = gh, log = console.log) {
         '--field-id',
         field.id,
       ];
-      if (name === 'Weight') {
-        args.push('--number', String(values[name]));
-      } else {
-        const option = field.options?.find(
-          (candidate) => candidate.name === values[name],
-        );
-        requireValue(option, `Option ${values[name]} absente de ${name}.`);
-        args.push('--single-select-option-id', option.id);
-      }
+      const option = field.options?.find(
+        (candidate) => candidate.name === values[name],
+      );
+      requireValue(option, `Option ${values[name]} absente de ${name}.`);
+      args.push('--single-select-option-id', option.id);
       run(args);
     }
   }
@@ -1192,6 +1263,16 @@ export function instantiate(config, options, run = gh, log = console.log) {
       }
     }
   }
+  if (options.prune)
+    pruneIssues(
+      { ...config, repo: options.repo },
+      existingIssues,
+      items,
+      project.id,
+      run,
+      log,
+      true,
+    );
   log(
     `${allTickets.length} tickets presents dans le projet. ${updated} contenu(s) mis a jour. Les champs deja renseignes sont conserves.`,
   );
@@ -1201,7 +1282,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
   if (options.help) {
     console.log(
-      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing] [--dry-run | --apply]\nSans --apply : simulation locale, sans requete GitHub.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
+      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing] [--prune] [--dry-run | --apply]\nSans --apply : simulation locale, sauf --prune qui consulte GitHub sans ecriture.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--prune exige --project-number : ferme les issues generees absentes du YAML et les retire uniquement du projet cible.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
     );
     return;
   }

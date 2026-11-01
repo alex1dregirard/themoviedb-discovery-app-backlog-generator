@@ -82,7 +82,13 @@ les issues et conservent leur avancement. L'option `--update-existing` remplace
 explicitement leurs titres et descriptions, y compris les modifications
 manuelles, mais conserve les commentaires et champs déjà renseignés.
 `--config chemin/backlog.yaml` permet de fournir une autre configuration.
-La simulation est locale et n'effectue aucun appel GitHub.
+La simulation sans `--prune` est locale et n'effectue aucun appel GitHub.
+
+Pour nettoyer les issues générées retirées du YAML, utiliser `--prune` avec
+`--project-number NUMERO`. Avec `--dry-run`, cette option consulte GitHub sans
+écriture et affiche les issues concernées. Avec `--apply`, elle les ferme et
+les retire du projet ciblé, sans suppression définitive. Les issues manuelles
+et celles hors du projet sont conservées.
 
 L'extraction depuis l'application ne déplace ni ne supprime les issues et
 Projects existants. Pour mettre à jour le projet pédagogique de référence :
