@@ -1795,8 +1795,8 @@ test('Priority and Epic palettes preserve identities, custom colors and rerun wi
   );
   for (const id of ['priority', 'epic'])
     assert.deepEqual(
-      palettes[id].map(({ color, ...option }) => option),
-      original[id].map(({ color, ...option }) => option),
+      palettes[id].map(({ color: _color, ...option }) => option),
+      original[id].map(({ color: _color, ...option }) => option),
     );
 });
 
