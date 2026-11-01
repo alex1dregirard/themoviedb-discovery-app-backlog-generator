@@ -313,6 +313,28 @@ function ensureTypeViews(
   columns,
   log,
 ) {
+  ensureFilteredViews(
+    run,
+    projectId,
+    definitions.map((definition) => ({
+      name: definition.name,
+      filter: personal
+        ? `label:${definition.type}`
+        : `type:${nativeTypes.get(definition.type)}`,
+    })),
+    columns,
+    log,
+  );
+}
+
+function ensureFilteredViews(
+  run,
+  projectId,
+  definitions,
+  columns,
+  log,
+  exact = false,
+) {
   for (const definition of definitions) {
     ensureBacklogView(run, projectId, definition.name, log);
     const data = graphql(
@@ -338,9 +360,7 @@ function ensureTypeViews(
       (candidate) => candidate.name === definition.name,
     );
     requireValue(view, `Vue ${definition.name} absente.`);
-    const filter = personal
-      ? `label:${definition.type}`
-      : `type:${nativeTypes.get(definition.type)}`;
+    const filter = definition.filter;
     if (view.filter !== filter) {
       graphql(
         run,
@@ -357,7 +377,7 @@ function ensureTypeViews(
         { id: view.id, filter },
       );
     }
-    ensureBacklogColumns(run, projectId, definition.name, columns);
+    ensureBacklogColumns(run, projectId, definition.name, columns, exact);
   }
 }
 
@@ -1413,21 +1433,34 @@ export function instantiate(config, options, run = gh, log = console.log) {
       ],
       'scope',
     );
+  const backlogColumns = config.project.backlogColumns
+    ? config.project.backlogColumns.map((name) => {
+        const field = fields.find((candidate) => candidate.name === name);
+        requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
+        return field.id;
+      })
+    : allTickets.some((ticket) => ticket.scope !== undefined)
+      ? [...visibleFields, scopeField.id]
+      : visibleFields;
   ensureBacklogColumns(
     run,
     project.id,
     config.project.viewName,
-    config.project.backlogColumns
-      ? config.project.backlogColumns.map((name) => {
-          const field = fields.find((candidate) => candidate.name === name);
-          requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
-          return field.id;
-        })
-      : allTickets.some((ticket) => ticket.scope !== undefined)
-        ? [...visibleFields, scopeField.id]
-        : visibleFields,
+    backlogColumns,
     config.project.backlogColumns !== undefined,
   );
+  if (scopeField)
+    ensureFilteredViews(
+      run,
+      project.id,
+      ['backend', 'frontend'].map((scope) => ({
+        name: `Backlog ${scope}`,
+        filter: `scope:${scope}`,
+      })),
+      backlogColumns,
+      log,
+      config.project.backlogColumns !== undefined,
+    );
   if (options['create-issues'])
     ensureTypeViews(
       run,

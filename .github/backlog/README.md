@@ -121,6 +121,13 @@ personnel. **Backlog** reste la vue globale. Les relances ne dupliquent pas ces
 vues ; les filtres de **Features** et **Bugs** sont synchronisés avec la
 configuration. Title, Epic et Size sont visibles dans Backlog, Features et Bugs.
 
+Lorsque le champ **scope** existe, le générateur configure aussi deux vues
+tabulaires **Backlog backend** et **Backlog frontend**, filtrées respectivement
+par `scope:backend` et `scope:frontend`. Elles reprennent les colonnes configurées
+pour Backlog et fonctionnent avec les brouillons comme avec les issues.
+Les relances réutilisent ces vues et synchronisent leurs filtres sans modifier
+le statut ni les estimations des tickets.
+
 ### Estimer en tailles de T-shirt
 
 | Taille | Repère pour la discussion                                        |

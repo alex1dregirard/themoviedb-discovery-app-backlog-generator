@@ -51,6 +51,10 @@ d'issues. Leur identité repose sur les clés stables du YAML. La création
 d'issues doit être demandée explicitement avec `--create-issues --apply`.
 `--prune` nécessite aussi `--create-issues` ; il ne supprime pas les brouillons.
 
+Les vues **Backlog backend** et **Backlog frontend** sont configurées lorsque
+le champ `scope` existe. Elles filtrent les tickets par périmètre, avec les
+mêmes colonnes que Backlog, en mode brouillons comme en mode issues.
+
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
 avant d'utiliser `--apply`, qui applique la configuration au projet GitHub et
 peut créer un projet ou des tickets selon les options. Sans
