@@ -5,6 +5,49 @@ Ce dépôt contient le générateur de backlog pédagogique pour les projets
 Il est indépendant de l'application : il crée les issues et configure un
 GitHub Project dans le dépôt cible explicitement choisi.
 
+## Utiliser le projet avec GitHub Codespaces
+
+Pour travailler sur votre propre copie, ouvrez la page GitHub de ce dépôt et
+cliquez sur **Fork**. Une fois le fork créé dans votre compte ou votre
+organisation, ouvrez-le, puis choisissez **Code > Codespaces > Create codespace
+on [branche]**. Le Codespace s'ouvre directement sur votre fork.
+
+Dans le terminal du Codespace, vérifiez Node.js et installez les dépendances :
+
+```sh
+nvm install 24
+nvm use 24
+npm ci
+```
+
+Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Vérifiez également
+que le CLI GitHub est connecté :
+
+```sh
+gh auth status
+```
+
+Le jeton doit permettre de créer des issues et un GitHub Project. Si votre
+authentification le permet, ajoutez l'accès aux Projects avec
+`gh auth refresh -s project`. Les droits du Codespace et les règles de
+l'organisation cible peuvent limiter ces opérations.
+
+Le fork sert de copie du générateur : `--repo` doit désigner le dépôt dans
+lequel vous voulez créer les issues et le GitHub Project, pas le fork du
+générateur (sauf si c'est réellement votre cible). Depuis le terminal du
+Codespace, remplacez `MON_LOGIN` et `MON_DEPOT`, lancez d'abord une simulation,
+puis l'import :
+
+```sh
+npm run backlog:instantiate -- --repo MON_LOGIN/MON_DEPOT --owner MON_LOGIN --dry-run
+npm run backlog:instantiate -- --repo MON_LOGIN/MON_DEPOT --owner MON_LOGIN --apply
+```
+
+`--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
+avant d'utiliser `--apply`, qui crée réellement les issues et le projet.
+Pour reprendre un projet existant, ajoutez `--project-number NUMERO` comme
+expliqué ci-dessous.
+
 ## Installation et utilisation
 
 Cloner ce dépôt, puis exécuter les commandes depuis son répertoire :
