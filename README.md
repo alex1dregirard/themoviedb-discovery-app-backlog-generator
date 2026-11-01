@@ -12,23 +12,17 @@ cliquez sur **Fork**. Une fois le fork créé dans votre compte ou votre
 organisation, ouvrez-le, puis choisissez **Code > Codespaces > Create codespace
 on [branche]**. Le Codespace s'ouvre directement sur votre fork.
 
-Dans le terminal du Codespace, vérifiez Node.js et installez les dépendances :
-
-```sh
-nvm install 24
-nvm use 24
-npm ci
-```
-
-Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Vérifiez également
-que le CLI GitHub est connecté :
+Le Codespace configure Node.js 24 et installe les dépendances à sa création.
+Dans le terminal, vérifiez que le CLI GitHub est connecté :
 
 ```sh
 gh auth status
 ```
 
-Le jeton doit permettre de créer des issues et un GitHub Project. Si votre
-authentification le permet, ajoutez l'accès aux Projects avec
+Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Si les dépendances
+changent après la création du Codespace, exécutez `npm ci`. Le jeton doit
+permettre de créer des issues et un GitHub Project. Si votre authentification
+le permet, ajoutez l'accès aux Projects avec
 `gh auth refresh -s project`. Les droits du Codespace et les règles de
 l'organisation cible peuvent limiter ces opérations.
 
