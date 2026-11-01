@@ -209,7 +209,37 @@ mise en page. Si des vues personnalisées existent déjà, elles sont conservée
 une vue tabulaire Backlog est ajoutée si nécessaire. Les relances ne créent pas
 de vue en double. Les colonnes **Epic** et **Size** sont rendues visibles
 immédiatement après **Title**, dans cet ordre, sans retirer les autres colonnes
-ni modifier leur ordre relatif.
+ni modifier leur ordre relatif lorsque `project.backlogColumns` est absent.
+
+Par défaut, `--apply` crée ou réutilise des **brouillons du projet**, identifiés
+par leur marqueur stable, et ne crée aucune issue. `--update-existing` met aussi
+à jour leurs titres et descriptions ; les champs déjà renseignés restent
+préservés et les dépendances pointent vers les brouillons. Les milestones et
+types natifs Feature/Bug ne sont pas appliqués aux brouillons. Les vues filtrées
+Features/Bugs ne sont configurées qu'en mode issues.
+
+La création d'issues nécessite désormais **`--create-issues --apply`**.
+`--prune` nécessite également `--create-issues` et reste limité aux issues.
+Un ticket déjà présent comme issue n'est pas automatiquement dupliqué en
+brouillon : le script signale le conflit. Inversement, n'utilisez pas le mode
+issues pour importer un backlog déjà conservé en brouillons sans conversion
+préalable, afin de ne pas dupliquer les tickets.
+
+`project.backlogColumns` déclare la liste exacte des colonnes visibles et leur
+ordre. Le champ texte **dependsOn** affiche les identifiants de tickets du YAML,
+séparés par des virgules ; une liste vide laisse la cellule vide. Il est créé
+si cette colonne est configurée et synchronisé à chaque instanciation, pour les
+brouillons comme pour les issues. Il ne crée pas de relations natives GitHub.
+
+Cette liste définit les colonnes et leur
+ordre dans Backlog. La configuration actuelle affiche Title, Epic, Size, scope,
+Priority, Status, Linked pull requests et Sub-issues progress ; Assignees est
+masqué. Les noms sont ceux des champs GitHub, uniques, avec Title en premier.
+Une colonne inconnue provoque une erreur explicite. À chaque instanciation,
+le générateur applique cette liste, sans supprimer les champs ni leurs valeurs
+et sans changer les autres vues. Les configurations anciennes sans cette liste
+conservent le comportement additif précédent. Cette option décrit la visibilité
+enregistrée côté GitHub, pas une vérification visuelle du navigateur.
 
 La vue tabulaire **Epics**, nommée par `project.epicViewName`, affiche **Title**
 et **Epic**. Pour regrouper les tickets dans GitHub, choisir **Group by > Epic**

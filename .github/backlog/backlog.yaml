@@ -5,6 +5,14 @@ milestones:
 project:
   title: TMDB - Backlog
   viewName: Backlog
+  backlogColumns:
+    - Title
+    - Epic
+    - Size
+    - scope
+    - Priority
+    - dependsOn
+    - Status
   epicViewName: Epics
   typeViews:
     - name: Features
@@ -470,6 +478,22 @@ epics:
         definitionOfDone:
           - Le widget est disponible dans Storybook avec Animation et 7,68 / 10 ainsi que ses états.
           - Des tests vérifient libellé, format et données absentes ; le contrat des propriétés et la formule validée sont documentés.
+      - id: DASHBOARD-25
+        key: DASHBOARD-25
+        type: feature
+        scope: frontend
+        title: Intégrer l'ensemble des widgets dans le tableau de bord
+        story: |
+          En tant qu'utilisateur, je veux voir tous les widgets intégrés dans le tableau de bord afin d'avoir une vue complète des indicateurs.
+        size: M
+        priority: P2
+        dependsOn: [DASHBOARD-24]
+        acceptance:
+          - Tous les widgets existants sont visibles et correctement disposés dans le tableau de bord.
+          - Les interactions entre les widgets sont testées et fonctionnent comme prévu.
+        definitionOfDone:
+          - La page du tableau de bord est disponible dans l'application avec tous les widgets intégrés.
+          - Des tests vérifient la disposition, la visibilité et les interactions des widgets.
       # - id: DASHBOARD-04
       #   key: EXPL-COUNTRIES-CSV
       #   type: feature

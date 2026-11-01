@@ -7,6 +7,7 @@ import {
   issueBody,
   marker,
   parseOptions,
+  syncDependencies,
   validateBacklog,
 } from '../instantiate-backlog.mjs';
 
@@ -45,6 +46,7 @@ const config = {
     })),
   })),
 };
+delete config.project.backlogColumns;
 
 test('backlog accepts a growing set of ideas with unique tickets', () => {
   validateBacklog(configuredBacklog);
@@ -410,6 +412,7 @@ test('target is explicit and writes require --apply', () => {
 test('authenticated user is the default owner when --owner is omitted', () => {
   const f = fixture();
   const options = parseOptions(['--repo', 'movies', '--apply']);
+  options['create-issues'] = true;
   const calls = [];
   const run = (args, input) => {
     calls.push(args);
@@ -450,7 +453,7 @@ test('scope supports backend/frontend and remains optional for older configurati
   assert.ok(
     configuredBacklog.epics
       .flatMap((epic) => epic.tickets)
-      .every((ticket) => ticket.scope === 'backend'),
+      .every((ticket) => ['backend', 'frontend'].includes(ticket.scope)),
   );
   for (const scope of ['backend', 'frontend']) {
     const f = fixture();
@@ -517,6 +520,57 @@ test('scope supports backend/frontend and remains optional for older configurati
     invalid.epics[0].tickets[0].scope = scope;
     assert.throws(() => validateBacklog(invalid), /scope/);
   }
+});
+
+test('Backlog configured columns are exact, ordered and do not change other views', () => {
+  const f = fixture({ existing: true });
+  f.small.project.backlogColumns = ['Title', 'Priority', 'Status'];
+  const updates = [];
+  const run = (args, input) => {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('updateProjectV2View')) updates.push(variables);
+    }
+    return f.run(args, input);
+  };
+  instantiate(f.small, f.options, run, () => {});
+  assert.deepEqual(updates, [
+    { id: 'view', fields: ['title', 'priority', 'status'] },
+  ]);
+  for (const columns of [
+    [],
+    ['Priority'],
+    ['Title', 'Title'],
+    ['Title', ''],
+    ['Title', 42],
+    'Title',
+  ]) {
+    const invalid = structuredClone(config);
+    invalid.project.backlogColumns = columns;
+    assert.throws(() => validateBacklog(invalid), /backlogColumns/);
+  }
+  f.small.project.backlogColumns = ['Title', 'Missing'];
+  assert.throws(
+    () => instantiate(f.small, f.options, run, () => {}),
+    /Colonne Backlog inconnue/,
+  );
+});
+
+test('dependsOn text reflects YAML dependencies and clears obsolete values', () => {
+  const calls = [];
+  const run = (args) => calls.push(args);
+  const fields = [{ id: 'dependencies', name: 'dependsOn' }];
+  syncDependencies(run, 'project', 'item', fields, {
+    dependsOn: ['DASHBOARD-01', 'DASHBOARD-12'],
+  });
+  assert.deepEqual(calls[0].slice(-2), [
+    '--text',
+    'DASHBOARD-01, DASHBOARD-12',
+  ]);
+  syncDependencies(run, 'project', 'item', fields, { dependsOn: [] });
+  assert.equal(calls[1].at(-1), '--clear');
+  syncDependencies(run, 'project', 'item', [], { dependsOn: [] });
+  assert.equal(calls.length, 2);
 });
 
 test('prune requires an existing project number', () => {
@@ -928,10 +982,82 @@ function fixture({
       repo: 'student/movies',
       owner: 'student',
       apply: true,
+      'create-issues': true,
       ...(existing ? { 'project-number': '7' } : {}),
     },
   };
 }
+
+test('apply defaults to draft tickets, reuses stable keys and never creates issues', () => {
+  const f = fixture({ existing: true });
+  const draftOptions = { ...f.options, 'create-issues': false };
+  let items = [];
+  let creates = 0;
+  const mutations = [];
+  function drafts(args, input) {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('... on DraftIssue') && query.includes('items(first:'))
+        return JSON.stringify({
+          data: {
+            node: { items: { nodes: items, pageInfo: { hasNextPage: false } } },
+          },
+        });
+      if (query.includes('addProjectV2DraftIssue')) {
+        creates++;
+        const item = {
+          id: 'draft-item',
+          fullDatabaseId: '123',
+          type: 'DRAFT_ISSUE',
+          content: {
+            id: 'draft',
+            title: variables.input.title,
+            body: variables.input.body,
+          },
+          fieldValues: { nodes: [], pageInfo: { hasNextPage: false } },
+        };
+        items.push(item);
+        return JSON.stringify({
+          data: { addProjectV2DraftIssue: { projectItem: item } },
+        });
+      }
+      if (query.includes('updateProjectV2DraftIssue')) {
+        mutations.push(variables.input);
+        Object.assign(items[0].content, variables.input);
+        return JSON.stringify({
+          data: { updateProjectV2DraftIssue: { draftIssue: { id: 'draft' } } },
+        });
+      }
+    }
+    if (args[1] === 'item-edit') {
+      const field = args[args.indexOf('--field-id') + 1];
+      const name = {
+        status: 'Status',
+        size: 'Size',
+        epic: 'Epic',
+        priority: 'Priority',
+      }[field];
+      items[0].fieldValues.nodes.push({ field: { name }, name: 'kept' });
+      return '';
+    }
+    return f.run(args, input);
+  }
+  instantiate(f.small, draftOptions, drafts, () => {});
+  instantiate(f.small, draftOptions, drafts, () => {});
+  assert.equal(creates, 1);
+  assert.ok(!f.calls.some(({ args }) => args.includes('POST')));
+  assert.equal(parseOptions(['--repo', 'movies'])['create-issues'], false);
+  assert.throws(
+    () =>
+      parseOptions(['--repo', 'movies', '--prune', '--project-number', '7']),
+    /--create-issues/,
+  );
+  draftOptions['update-existing'] = true;
+  f.small.epics[0].tickets[0].title = 'Updated draft';
+  instantiate(f.small, draftOptions, drafts, () => {});
+  assert.equal(mutations.length, 1);
+  assert.ok(items[0].content.title.includes('Updated draft'));
+});
 
 test('apply creates issues and assigns Backlog, size, epic and priority', () => {
   const { small, calls, run, options } = fixture();

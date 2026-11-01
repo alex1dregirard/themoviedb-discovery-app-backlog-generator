@@ -39,6 +39,11 @@ npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
 npm run backlog:instantiate -- --repo MON_DEPOT --apply
 ```
 
+Par défaut, `--apply` synchronise des **brouillons GitHub Projects** sans créer
+d'issues. Leur identité repose sur les clés stables du YAML. La création
+d'issues doit être demandée explicitement avec `--create-issues --apply`.
+`--prune` nécessite aussi `--create-issues` ; il ne supprime pas les brouillons.
+
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
 avant d'utiliser `--apply`, qui crée réellement les issues et le projet.
 Pour reprendre un projet existant, ajoutez `--project-number NUMERO` comme

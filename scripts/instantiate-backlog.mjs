@@ -53,6 +53,18 @@ export function validateBacklog(config) {
       config.project.epicViewName !== config.project.viewName,
     'Nom de vue Epic manquant ou identique a la vue Backlog.',
   );
+  if (config.project.backlogColumns !== undefined)
+    requireValue(
+      Array.isArray(config.project.backlogColumns) &&
+        config.project.backlogColumns[0] === 'Title' &&
+        config.project.backlogColumns.every(
+          (name) =>
+            typeof name === 'string' && name.trim() === name && name.length > 0,
+        ) &&
+        new Set(config.project.backlogColumns).size ===
+          config.project.backlogColumns.length,
+      'backlogColumns doit contenir des noms de champs uniques et commencer par Title.',
+    );
   requireValue(
     Array.isArray(config.project.stages) &&
       config.project.stages[0] === 'Backlog' &&
@@ -426,7 +438,13 @@ function ensureBacklogView(run, projectId, name, log) {
   log(`Vue ${name} configuree.`);
 }
 
-function ensureBacklogColumns(run, projectId, viewName, requiredIds) {
+function ensureBacklogColumns(
+  run,
+  projectId,
+  viewName,
+  requiredIds,
+  exact = false,
+) {
   const data = graphql(
     run,
     `
@@ -470,8 +488,9 @@ function ensureBacklogColumns(run, projectId, viewName, requiredIds) {
   const ids = view.configuration.visibleFields.nodes.map((field) => field.id);
   const remaining = ids.filter((id) => !requiredIds.slice(1).includes(id));
   const titleIndex = remaining.indexOf(requiredIds[0]);
-  const ordered =
-    titleIndex === -1
+  const ordered = exact
+    ? requiredIds
+    : titleIndex === -1
       ? [...requiredIds, ...remaining]
       : [
           ...remaining.slice(0, titleIndex + 1),
@@ -629,6 +648,7 @@ export function parseOptions(args) {
       apply: { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       'update-existing': { type: 'boolean', default: false },
+      'create-issues': { type: 'boolean', default: false },
       prune: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
     },
@@ -656,6 +676,10 @@ export function parseOptions(args) {
   requireValue(
     !values.prune || values['project-number'],
     '--prune exige --project-number pour cibler un projet existant.',
+  );
+  requireValue(
+    !values.prune || values['create-issues'],
+    '--prune exige --create-issues : aucune issue modifiee en mode brouillons.',
   );
   return values;
 }
@@ -795,8 +819,242 @@ function pruneIssues(config, issues, items, projectId, run, log, apply) {
   );
 }
 
+export function syncDependencies(run, projectId, itemId, fields, ticket) {
+  const field = fields.find((field) => field.name === 'dependsOn');
+  if (!field) return;
+  run([
+    'project',
+    'item-edit',
+    '--id',
+    itemId,
+    '--project-id',
+    projectId,
+    '--field-id',
+    field.id,
+    ...(ticket.dependsOn.length
+      ? ['--text', ticket.dependsOn.join(', ')]
+      : ['--clear']),
+  ]);
+}
+
+function instantiateDrafts(config, options, run, log, project) {
+  const items = [];
+  let cursor = null;
+  do {
+    const data = graphql(
+      run,
+      `
+        query ($id: ID!, $cursor: String) {
+          node(id: $id) {
+            ... on ProjectV2 {
+              items(first: 100, after: $cursor) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  id
+                  fullDatabaseId
+                  type
+                  content {
+                    ... on DraftIssue {
+                      id
+                      title
+                      body
+                    }
+                    ... on Issue {
+                      id
+                      title
+                      body
+                    }
+                  }
+                  fieldValues(first: 100) {
+                    pageInfo {
+                      hasNextPage
+                    }
+                    nodes {
+                      ... on ProjectV2ItemFieldSingleSelectValue {
+                        name
+                        field {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      { id: project.id, cursor },
+    );
+    requireValue(
+      data.node?.items,
+      'Impossible de lire les brouillons du projet.',
+    );
+    for (const item of data.node.items.nodes) {
+      requireValue(
+        !item.fieldValues.pageInfo.hasNextPage,
+        'Trop de champs sur un ticket du projet.',
+      );
+      items.push(item);
+    }
+    cursor = data.node.items.pageInfo.hasNextPage
+      ? data.node.items.pageInfo.endCursor
+      : null;
+  } while (cursor);
+  const tickets = config.epics.flatMap((epic) =>
+    epic.tickets.map((ticket) => ({ epic, ticket })),
+  );
+  const matched = new Map();
+  const urls = new Map();
+  for (const { ticket } of tickets) {
+    const matches = items.filter((item) => {
+      const markers = [
+        ...(item.content?.body ?? '').matchAll(
+          /<!-- tmdb-student-backlog:([A-Z][A-Z0-9-]*) -->/g,
+        ),
+      ];
+      return (
+        markers.length === 1 && markers[0][1] === (ticket.key ?? ticket.id)
+      );
+    });
+    requireValue(
+      matches.length <= 1,
+      `Plusieurs tickets correspondent a ${ticket.id}.`,
+    );
+    if (matches[0]) {
+      requireValue(
+        matches[0].type === 'DRAFT_ISSUE',
+        `${ticket.id} est une issue : convertir manuellement ou utiliser --create-issues.`,
+      );
+      matched.set(ticket.id, matches[0]);
+      urls.set(
+        ticket.id,
+        `${project.url}?pane=issue&itemId=${matches[0].fullDatabaseId}`,
+      );
+    }
+  }
+  const fields = json(run, [
+    'project',
+    'field-list',
+    String(project.number),
+    '--owner',
+    options.owner,
+    '--format',
+    'json',
+    '--limit',
+    '100',
+  ]).fields;
+  for (const { epic, ticket } of tickets) {
+    if (matched.has(ticket.id)) continue;
+    const result = graphql(
+      run,
+      `
+        mutation ($input: AddProjectV2DraftIssueInput!) {
+          addProjectV2DraftIssue(input: $input) {
+            projectItem {
+              id
+              fullDatabaseId
+              content {
+                ... on DraftIssue {
+                  id
+                  title
+                  body
+                }
+              }
+            }
+          }
+        }
+      `,
+      {
+        input: {
+          projectId: project.id,
+          title: `[${ticket.id}] ${ticket.title}`,
+          body: issueBody(epic, ticket, config, urls),
+        },
+      },
+    );
+    const item = result.addProjectV2DraftIssue?.projectItem;
+    requireValue(
+      item?.id && item.content?.id && item.fullDatabaseId,
+      `Creation du brouillon ${ticket.id} sans identifiant.`,
+    );
+    matched.set(ticket.id, {
+      ...item,
+      fieldValues: { nodes: [] },
+      created: true,
+    });
+    urls.set(
+      ticket.id,
+      `${project.url}?pane=issue&itemId=${item.fullDatabaseId}`,
+    );
+    log(`Brouillon cree : ${ticket.id}`);
+  }
+  for (const { epic, ticket } of tickets) {
+    const item = matched.get(ticket.id);
+    syncDependencies(run, project.id, item.id, fields, ticket);
+    if (item.created || options['update-existing']) {
+      const title = `[${ticket.id}] ${ticket.title}`;
+      const body = issueBody(epic, ticket, config, urls);
+      if (item.content.title !== title || item.content.body !== body)
+        graphql(
+          run,
+          `
+            mutation ($input: UpdateProjectV2DraftIssueInput!) {
+              updateProjectV2DraftIssue(input: $input) {
+                draftIssue {
+                  id
+                }
+              }
+            }
+          `,
+          { input: { draftIssueId: item.content.id, title, body } },
+        );
+    }
+    const populated = new Set(
+      item.fieldValues.nodes.map((value) => value.field?.name),
+    );
+    for (const [name, value] of Object.entries({
+      Status: 'Backlog',
+      Epic: epic.id,
+      Priority: ticket.priority,
+      Size: ticket.size,
+      ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
+    })) {
+      if (populated.has(name)) continue;
+      const field = fields.find((field) => field.name === name);
+      const option = field?.options?.find((option) => option.name === value);
+      requireValue(option, `Option ${value} absente de ${name}.`);
+      run([
+        'project',
+        'item-edit',
+        '--id',
+        item.id,
+        '--project-id',
+        project.id,
+        '--field-id',
+        field.id,
+        '--single-select-option-id',
+        option.id,
+      ]);
+    }
+  }
+  log(
+    `${tickets.length} tickets brouillons synchronises ; aucune issue creee.`,
+  );
+}
+
 export function instantiate(config, options, run = gh, log = console.log) {
   validateBacklog(config);
+  requireValue(
+    !options.prune || options['create-issues'],
+    '--prune exige --create-issues : aucune issue modifiee en mode brouillons.',
+  );
   requireValue(
     !options.prune || options['project-number'],
     '--prune exige --project-number pour cibler un projet existant.',
@@ -864,7 +1122,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
     'hasIssuesEnabled,viewerPermission',
   ]);
   requireValue(
-    repository.hasIssuesEnabled,
+    !options['create-issues'] || repository.hasIssuesEnabled,
     'Les issues doivent etre activees dans le depot cible.',
   );
   requireValue(
@@ -878,7 +1136,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
   );
   const personal = repositoryDetails.owner.type === 'User';
   const nativeTypes = new Map();
-  if (!personal) {
+  if (!personal && options['create-issues']) {
     const issueTypes = json(run, [
       'api',
       `orgs/${options.repo.split('/')[0]}/issue-types`,
@@ -896,9 +1154,11 @@ export function instantiate(config, options, run = gh, log = console.log) {
     }
   }
   log(
-    personal
-      ? 'Depot personnel : les types seront representes par des labels.'
-      : 'Depot d organisation : types natifs Feature et Bug.',
+    !options['create-issues']
+      ? 'Mode brouillons : aucune issue creee.'
+      : personal
+        ? 'Depot personnel : les types seront representes par des labels.'
+        : 'Depot d organisation : types natifs Feature et Bug.',
   );
   const existingIssues = readRepositoryIssues(run, options.repo);
   const issueUrls = new Map();
@@ -918,7 +1178,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
   }
 
   const milestones = new Map();
-  if (config.milestones?.length) {
+  if (options['create-issues'] && config.milestones?.length) {
     const pages = json(run, [
       'api',
       `repos/${options.repo}/milestones?state=all&per_page=100`,
@@ -1040,11 +1300,31 @@ export function instantiate(config, options, run = gh, log = console.log) {
       ?.options?.some((option) => option.name === 'Backlog'),
     'Ajouter manuellement l option Backlog au champ Status du projet existant, puis relancer.',
   );
+  if (config.project.backlogColumns?.includes('dependsOn')) {
+    const field = fields.find((candidate) => candidate.name === 'dependsOn');
+    if (!field)
+      run([
+        'project',
+        'field-create',
+        number,
+        ...projectArgs,
+        '--name',
+        'dependsOn',
+        '--data-type',
+        'TEXT',
+      ]);
+    else
+      requireValue(
+        field.type === 'ProjectV2Field' && !field.options,
+        'dependsOn doit etre un champ TEXT.',
+      );
+  }
   const specifications = [
     { name: 'Size', values: config.sizes.map((size) => size.name) },
     { name: 'Epic', values: config.epics.map((epic) => epic.id) },
     { name: 'Priority', values: ['P1', 'P2', 'P3'] },
-    ...(allTickets.some((ticket) => ticket.scope !== undefined)
+    ...(allTickets.some((ticket) => ticket.scope !== undefined) ||
+    config.project.backlogColumns?.includes('scope')
       ? [{ name: 'scope', values: ['backend', 'frontend'] }]
       : []),
   ];
@@ -1115,24 +1395,36 @@ export function instantiate(config, options, run = gh, log = console.log) {
     run,
     project.id,
     config.project.viewName,
-    allTickets.some((ticket) => ticket.scope !== undefined)
-      ? [...visibleFields, scopeField.id]
-      : visibleFields,
+    config.project.backlogColumns
+      ? config.project.backlogColumns.map((name) => {
+          const field = fields.find((candidate) => candidate.name === name);
+          requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
+          return field.id;
+        })
+      : allTickets.some((ticket) => ticket.scope !== undefined)
+        ? [...visibleFields, scopeField.id]
+        : visibleFields,
+    config.project.backlogColumns !== undefined,
   );
   ensureBacklogView(run, project.id, config.project.epicViewName, log);
   ensureBacklogColumns(run, project.id, config.project.epicViewName, [
     visibleFields[0],
     visibleFields[1],
   ]);
-  ensureTypeViews(
-    run,
-    project.id,
-    config.project.typeViews,
-    personal,
-    nativeTypes,
-    visibleFields,
-    log,
-  );
+  if (options['create-issues'])
+    ensureTypeViews(
+      run,
+      project.id,
+      config.project.typeViews,
+      personal,
+      nativeTypes,
+      visibleFields,
+      log,
+    );
+  if (!options['create-issues']) {
+    instantiateDrafts(config, options, run, log, project);
+    return;
+  }
   const items = readProjectItems(run, project.id);
   if (personal) {
     const labels = json(run, [
@@ -1265,6 +1557,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
         .filter((value) => value.field?.name)
         .map((value) => value.field.name),
     );
+    syncDependencies(run, project.id, item.id, fields, ticket);
     const values = {
       Status: 'Backlog',
       Size: ticket.size,
@@ -1345,6 +1638,9 @@ export function instantiate(config, options, run = gh, log = console.log) {
 export function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
   if (options.help) {
+    console.log(
+      '--apply utilise des brouillons par defaut. Ajouter --create-issues pour creer des issues ; --prune exige aussi --create-issues.',
+    );
     console.log(
       'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing] [--prune] [--dry-run | --apply]\nSans --apply : simulation locale, sauf --prune qui consulte GitHub sans ecriture.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--prune exige --project-number : ferme les issues generees absentes du YAML et les retire uniquement du projet cible.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
     );
