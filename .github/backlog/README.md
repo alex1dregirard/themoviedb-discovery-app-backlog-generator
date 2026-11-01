@@ -97,6 +97,17 @@ Chaque ticket définit sa propre **Definition of Done** dans la liste obligatoir
 pour terminer ce ticket, distincts de ses critères d'acceptation. Le générateur
 la rend sous forme de cases à cocher, sans liste globale ni valeur par défaut.
 
+La propriété facultative `scope` indique la couche technique : `backend` ou
+`frontend`. Tous les tickets actuellement spécifiés, y compris DASHBOARD-10,
+déclarent `scope: backend`. À l'import, le générateur crée ou complète le champ
+GitHub **scope** avec ces deux options et le rend visible dans Backlog.
+Le générateur applique la palette **backend bleu**, **frontend violet**,
+en conservant les identifiants des options et leurs descriptions.
+Il initialise la valeur des tickets sans remplacer un périmètre déjà renseigné.
+Les configurations sans `scope` restent compatibles et n'imposent aucun
+périmètre. Cette propriété est distincte de `type: feature` ou `type: bug`,
+qui continue à déterminer le type natif GitHub ou le label correspondant.
+
 La configuration `project.typeViews` définit deux vues supplémentaires :
 **Features** et **Bugs**. Elles sont filtrées respectivement avec `type:Feature`
 et `type:Bug` en organisation, ou `label:feature` et `label:bug` sur un dépôt

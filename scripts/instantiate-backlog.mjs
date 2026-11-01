@@ -161,6 +161,11 @@ export function validateBacklog(config) {
           `${ticket.id} : etapes de reproduction manquantes.`,
         );
       requireValue(
+        ticket.scope === undefined ||
+          ['backend', 'frontend'].includes(ticket.scope),
+        `${ticket.id} : scope doit etre backend ou frontend.`,
+      );
+      requireValue(
         config.sizes.some((size) => size.name === ticket.size),
         `${ticket.id} : taille inconnue.`,
       );
@@ -536,7 +541,7 @@ function extendSelectField(run, field, names, log) {
   );
 }
 
-function ensureSizeColors(run, fieldId, sizes) {
+function ensureSelectColors(run, fieldId, palette, fieldName) {
   const data = graphql(
     run,
     `
@@ -557,11 +562,11 @@ function ensureSizeColors(run, fieldId, sizes) {
   );
   requireValue(
     Array.isArray(data.node?.options),
-    'Impossible de lire les couleurs de Size.',
+    `Impossible de lire les couleurs de ${fieldName}.`,
   );
   const options = data.node.options.map((option) => {
-    const size = sizes.find((candidate) => candidate.name === option.name);
-    return size ? { ...option, color: size.color } : option;
+    const entry = palette.find((candidate) => candidate.name === option.name);
+    return entry ? { ...option, color: entry.color } : option;
   });
   if (
     options.every(
@@ -1014,6 +1019,9 @@ export function instantiate(config, options, run = gh, log = console.log) {
     { name: 'Size', values: config.sizes.map((size) => size.name) },
     { name: 'Epic', values: config.epics.map((epic) => epic.id) },
     { name: 'Priority', values: ['P1', 'P2', 'P3'] },
+    ...(allTickets.some((ticket) => ticket.scope !== undefined)
+      ? [{ name: 'scope', values: ['backend', 'frontend'] }]
+      : []),
   ];
   for (const specification of specifications) {
     const field = fields.find(
@@ -1058,8 +1066,30 @@ export function instantiate(config, options, run = gh, log = console.log) {
     requireValue(field, `Champ ${name} absent.`);
     return field.id;
   });
-  ensureSizeColors(run, visibleFields[2], config.sizes);
-  ensureBacklogColumns(run, project.id, config.project.viewName, visibleFields);
+  ensureSelectColors(run, visibleFields[2], config.sizes, 'Size');
+  const scopeField = fields.find((field) => field.name === 'scope');
+  requireValue(
+    !allTickets.some((ticket) => ticket.scope !== undefined) || scopeField?.id,
+    'Champ scope absent.',
+  );
+  if (allTickets.some((ticket) => ticket.scope !== undefined))
+    ensureSelectColors(
+      run,
+      scopeField.id,
+      [
+        { name: 'backend', color: 'BLUE' },
+        { name: 'frontend', color: 'PURPLE' },
+      ],
+      'scope',
+    );
+  ensureBacklogColumns(
+    run,
+    project.id,
+    config.project.viewName,
+    allTickets.some((ticket) => ticket.scope !== undefined)
+      ? [...visibleFields, scopeField.id]
+      : visibleFields,
+  );
   ensureBacklogView(run, project.id, config.project.epicViewName, log);
   ensureBacklogColumns(run, project.id, config.project.epicViewName, [
     visibleFields[0],
@@ -1211,8 +1241,13 @@ export function instantiate(config, options, run = gh, log = console.log) {
       Size: ticket.size,
       Epic: epic.id,
       Priority: ticket.priority,
+      ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
     };
-    for (const name of ['Status', ...fieldNames]) {
+    for (const name of [
+      'Status',
+      ...fieldNames,
+      ...(ticket.scope !== undefined ? ['scope'] : []),
+    ]) {
       if (populated.has(name)) continue;
       const field = fields.find((candidate) => candidate.name === name);
       requireValue(field, `Champ ${name} absent.`);

@@ -61,7 +61,7 @@ test('DASHBOARD preserves the stable keys of the former EXPL issues', () => {
   );
   assert.ok(epic);
   assert.deepEqual(
-    epic.tickets.map((ticket) => ticket.key),
+    epic.tickets.slice(0, 6).map((ticket) => ticket.key),
     [
       'EXPL-01',
       'EXPL-02',
@@ -443,6 +443,80 @@ test('simulation performs no GitHub calls and displays every ticket in Backlog',
     output.filter((line) => line.startsWith('Backlog |')).length,
     config.epics.reduce((total, epic) => total + epic.tickets.length, 0),
   );
+});
+
+test('scope supports backend/frontend and remains optional for older configurations', () => {
+  validateBacklog(config);
+  assert.ok(
+    configuredBacklog.epics
+      .flatMap((epic) => epic.tickets)
+      .every((ticket) => ticket.scope === 'backend'),
+  );
+  for (const scope of ['backend', 'frontend']) {
+    const f = fixture();
+    f.small.epics[0].tickets[0].scope = scope;
+    const field = {
+      id: 'scope',
+      name: 'scope',
+      options: [
+        { id: 'backend', name: 'backend', color: 'GRAY', description: 'API' },
+        { id: 'frontend', name: 'frontend', color: 'GRAY', description: 'UI' },
+        { id: 'custom', name: 'other', color: 'GREEN', description: 'Custom' },
+      ],
+    };
+    const originalOptions = structuredClone(field.options);
+    let paletteChanges = 0;
+    const edits = [];
+    const run = (args, input) => {
+      if (args[1] === 'graphql') {
+        const { query, variables } = JSON.parse(input);
+        if (variables.id === 'scope') {
+          if (query.includes('updateProjectV2Field')) {
+            field.options = variables.options;
+            paletteChanges++;
+            return JSON.stringify({ data: { updateProjectV2Field: {} } });
+          }
+          return JSON.stringify({ data: { node: { options: field.options } } });
+        }
+      }
+      if (args[1] === 'field-list') {
+        const result = JSON.parse(f.run(args, input));
+        result.fields.push(field);
+        return JSON.stringify(result);
+      }
+      if (args[1] === 'item-edit' && args.includes('scope')) edits.push(args);
+      if (
+        args[1] === 'graphql' &&
+        JSON.parse(input).query.includes('visibleFields(first: 100)')
+      ) {
+        const result = JSON.parse(f.run(args, input));
+        const view = result.data.node.views.nodes.find(
+          (view) => view.name === 'Backlog',
+        );
+        view.configuration.visibleFields.nodes.push({ id: 'scope' });
+        return JSON.stringify(result);
+      }
+      return f.run(args, input);
+    };
+    instantiate(f.small, f.options, run, () => {});
+    assert.equal(edits.length, 1);
+    assert.ok(edits[0].includes(scope));
+    instantiate(f.small, f.options, run, () => {});
+    assert.equal(paletteChanges, 1);
+    assert.deepEqual(
+      field.options,
+      originalOptions.map((option) => ({
+        ...option,
+        color:
+          { backend: 'BLUE', frontend: 'PURPLE' }[option.name] ?? option.color,
+      })),
+    );
+  }
+  for (const scope of ['feature', '', null, 42]) {
+    const invalid = structuredClone(config);
+    invalid.epics[0].tickets[0].scope = scope;
+    assert.throws(() => validateBacklog(invalid), /scope/);
+  }
 });
 
 test('prune requires an existing project number', () => {

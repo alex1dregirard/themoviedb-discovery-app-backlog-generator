@@ -36,6 +36,7 @@ epics:
       - id: DASHBOARD-01
         key: EXPL-01
         type: feature
+        scope: backend
         title: 'Spécifier le modèle de données à utiliser pour le tableau de bord'
         story: |
           En tant qu'analyste, je veux comprendre les informations disponibles dans TMDB et celles nécessaires au tableau de bord, afin de préparer leur collecte et de disposer d'une base de travail pour la modélisation.
@@ -83,6 +84,7 @@ epics:
       - id: DASHBOARD-02
         key: EXPL-02
         type: feature
+        scope: backend
         title: Mettre en place le schéma SQLite à partir de la spécification
         story: |
           En tant que développeur, je veux traduire la spécification DASHBOARD-01 en
@@ -116,6 +118,7 @@ epics:
       - id: DASHBOARD-03
         key: EXPL-GENRES
         type: feature
+        scope: backend
         title: Créer et mettre à jour les genres
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres
@@ -131,6 +134,7 @@ epics:
       - id: DASHBOARD-04
         key: EXPL-GENRES-CSV
         type: feature
+        scope: backend
         title: Importer et mettre à jour les genres à partir d'un fichier CSV
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
@@ -144,6 +148,7 @@ epics:
       - id: DASHBOARD-05
         key: EXPL-COUNTRIES-CSV
         type: feature
+        scope: backend
         title: Créer et mettre à jour les pays
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays
@@ -159,6 +164,7 @@ epics:
       - id: DASHBOARD-06
         key: EXPL-COUNTRIES-CSV-IMPORT
         type: feature
+        scope: backend
         title: Importer et mettre à jour les pays à partir d'un fichier CSV
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
@@ -172,6 +178,7 @@ epics:
       - id: DASHBOARD-07
         key: DASHBOARD-07
         type: feature
+        scope: backend
         title: Consommer et exposer l'API discover
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir consommer et exposer l'API discover afin de récupérer les films d'une année donnée.
@@ -187,6 +194,7 @@ epics:
       - id: DASHBOARD-08
         key: DASHBOARD-08
         type: feature
+        scope: backend
         title: Créer et mettre à jour les films
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les films afin de maintenir une liste de films cohérente et à jour.
@@ -201,6 +209,7 @@ epics:
       - id: DASHBOARD-09
         key: DASHBOARD-09
         type: feature
+        scope: backend
         title: Importer et mettre à jour les films à partir d'un fichier CSV
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir importer et mettre à jour les films à partir d'un fichier CSV afin de maintenir une liste de films cohérente et à jour.
@@ -215,6 +224,7 @@ epics:
       - id: DASHBOARD-10
         key: DASHBOARD-10
         type: feature
+        scope: backend
         title: Mettre en place le service permettant de mettre à jour les films, genres et pays à partir des APIs mises en place
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir mettre à jour les films, genres et pays à partir des APIs mises en place afin de maintenir une liste de films cohérente et à jour.
