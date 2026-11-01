@@ -76,6 +76,14 @@ test('milestones are optional, unique and referenced by title', () => {
   }
 });
 
+test('epic view name is required and unique from other project views', () => {
+  for (const epicViewName of ['', 'Backlog', 'Features', 'Bugs']) {
+    const invalid = structuredClone(configuredBacklog);
+    invalid.project.epicViewName = epicViewName;
+    assert.throws(() => validateBacklog(invalid), /vue/i);
+  }
+});
+
 test('milestone simulation stays local and displays definitions and ticket references', () => {
   const simulation = structuredClone(config);
   simulation.milestones = [{ title: '1.1.0' }];
@@ -456,6 +464,14 @@ function fixture({
       },
     },
   }));
+  const epicView = {
+    id: 'epic-view',
+    name: configuredBacklog.project.epicViewName,
+    number: 4,
+    configuration: {
+      visibleFields: { nodes: [{ id: 'title' }, { id: 'epic' }] },
+    },
+  };
   function run(args, input) {
     calls.push({ args, input });
     const command = args.slice(0, 2).join(' ');
@@ -535,6 +551,7 @@ function fixture({
                       },
                     },
                   },
+                  epicView,
                 ],
               },
             },
@@ -547,6 +564,7 @@ function fixture({
               views: {
                 nodes: [
                   { id: 'view', name: 'Backlog', number: 1 },
+                  epicView,
                   ...typeViews,
                 ],
                 pageInfo: { hasNextPage: false },
@@ -1246,11 +1264,11 @@ test('default view is renamed to configured Backlog once, without altering its l
   assert.equal(updates.length, 1);
 });
 
-test('custom views are preserved and a missing Backlog view is created', () => {
+test('custom views are preserved and missing Backlog and Epics views are created', () => {
   const { small, run, options } = fixture({ existing: true });
   const views = [{ id: 'custom', name: 'Sprint actuel', number: 1 }];
   const original = structuredClone(views[0]);
-  let creations = 0;
+  const createdNames = [];
   function withCustomView(args, input) {
     if (args[1] === 'graphql') {
       const { query, variables } = JSON.parse(input);
@@ -1262,9 +1280,10 @@ test('custom views are preserved and a missing Backlog view is created', () => {
               views: {
                 nodes: [
                   ...views,
-                  ...(creations
+                  ...(createdNames.length
                     ? JSON.parse(run(args, input)).data.node.views.nodes.filter(
-                        (candidate) => candidate.name !== 'Backlog',
+                        (candidate) =>
+                          !['Backlog', 'Epics'].includes(candidate.name),
                       )
                     : []),
                 ],
@@ -1276,11 +1295,11 @@ test('custom views are preserved and a missing Backlog view is created', () => {
 
       assert.ok(!query.includes('updateProjectV2View'));
       if (query.includes('createProjectV2View')) {
-        assert.equal(variables.name, 'Backlog');
+        assert.ok(['Backlog', 'Epics'].includes(variables.name));
         assert.ok(query.includes('TABLE_LAYOUT'));
         const view = { id: 'new-view', name: variables.name, number: 2 };
         views.push(view);
-        creations++;
+        createdNames.push(variables.name);
         return JSON.stringify({
           data: { createProjectV2View: { projectV2View: view } },
         });
@@ -1291,7 +1310,7 @@ test('custom views are preserved and a missing Backlog view is created', () => {
   instantiate(small, options, withCustomView, () => {});
   instantiate(small, options, withCustomView, () => {});
   assert.deepEqual(views[0], original);
-  assert.equal(creations, 1);
+  assert.deepEqual(createdNames, ['Backlog', 'Epics']);
 });
 
 test('Epic and Size follow Title while other columns keep their relative order', () => {
@@ -1344,6 +1363,38 @@ test('Epic and Size follow Title while other columns keep their relative order',
   }
   instantiate(small, options, visible, () => {});
   instantiate(small, options, visible, () => {});
+  assert.equal(updates, 1);
+});
+
+test('Epics view shows Title and Epic and repairs missing Epic column once', () => {
+  const { small, run, options } = fixture({ existing: true });
+  let epicColumns = [{ id: 'title' }];
+  let updates = 0;
+  function epicsView(args, input) {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('visibleFields(first: 100)')) {
+        const result = JSON.parse(run(args, input));
+        const view = result.data.node.views.nodes.find(
+          (candidate) => candidate.name === 'Epics',
+        );
+        view.configuration.visibleFields.nodes = epicColumns;
+        return JSON.stringify(result);
+      }
+      if (query.includes('visibleFieldIds:')) {
+        assert.deepEqual(variables.fields, ['title', 'epic']);
+        epicColumns = variables.fields.map((id) => ({ id }));
+        updates++;
+        return JSON.stringify({
+          data: { updateProjectV2View: { projectV2View: { id: 'epic-view' } } },
+        });
+      }
+    }
+    return run(args, input);
+  }
+  instantiate(small, options, epicsView, () => {});
+  instantiate(small, options, epicsView, () => {});
+  assert.deepEqual(epicColumns, [{ id: 'title' }, { id: 'epic' }]);
   assert.equal(updates, 1);
 });
 
@@ -1529,7 +1580,14 @@ test('Features and Bugs views are created and filtered once for each repository 
     }
     instantiate(small, options, filtered, () => {});
     instantiate(small, options, filtered, () => {});
-    assert.equal(creations, 2);
+    assert.equal(creations, 3);
+    assert.deepEqual(
+      views
+        .slice(1)
+        .map((view) => view.name)
+        .sort(),
+      ['Bugs', 'Epics', 'Features'],
+    );
     assert.deepEqual(
       filters,
       personalRepo

@@ -31,6 +31,12 @@ export function validateBacklog(config) {
     'Nom de vue manquant.',
   );
   requireValue(
+    typeof config.project.epicViewName === 'string' &&
+      config.project.epicViewName.trim() &&
+      config.project.epicViewName !== config.project.viewName,
+    'Nom de vue Epic manquant ou identique a la vue Backlog.',
+  );
+  requireValue(
     Array.isArray(config.project.stages) &&
       config.project.stages[0] === 'Backlog' &&
       config.project.stages.every(
@@ -75,7 +81,8 @@ export function validateBacklog(config) {
         (view) =>
           typeof view.name === 'string' &&
           view.name.trim() &&
-          view.name !== config.project.viewName,
+          view.name !== config.project.viewName &&
+          view.name !== config.project.epicViewName,
       ) &&
       config.project.typeViews
         .map((view) => view.type)
@@ -977,6 +984,11 @@ export function instantiate(config, options, run = gh, log = console.log) {
   });
   ensureSizeColors(run, visibleFields[2], config.sizes);
   ensureBacklogColumns(run, project.id, config.project.viewName, visibleFields);
+  ensureBacklogView(run, project.id, config.project.epicViewName, log);
+  ensureBacklogColumns(run, project.id, config.project.epicViewName, [
+    visibleFields[0],
+    visibleFields[1],
+  ]);
   ensureTypeViews(
     run,
     project.id,

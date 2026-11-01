@@ -90,9 +90,11 @@ encore la base, le CLI ni le tableau de bord.
 La configuration `project.typeViews` définit deux vues supplémentaires :
 **Features** et **Bugs**. Elles sont filtrées respectivement avec `type:Feature`
 et `type:Bug` en organisation, ou `label:feature` et `label:bug` sur un dépôt
-personnel. **Backlog** reste la vue globale. Les relances ne dupliquent pas ces vues ;
-leurs filtres sont synchronisés avec la configuration, et Title, Epic et Size
-sont visibles dans chacune.
+personnel. **Backlog** reste la vue globale ; **Epics** fournit une vue dédiée
+aux tickets associés à chaque epic. Les relances ne dupliquent pas ces vues ;
+les filtres de **Features** et **Bugs** sont synchronisés avec la configuration.
+Title, Epic et Size sont visibles dans Backlog, Features et Bugs ; Title et Epic
+sont visibles dans Epics.
 
 ### Estimer en tailles de T-shirt
 
@@ -182,10 +184,17 @@ de vue en double. Les colonnes **Epic** et **Size** sont rendues visibles
 immédiatement après **Title**, dans cet ordre, sans retirer les autres colonnes
 ni modifier leur ordre relatif.
 
+La vue tabulaire **Epics**, nommée par `project.epicViewName`, affiche **Title**
+et **Epic**. Pour regrouper les tickets dans GitHub, choisir **Group by > Epic**
+dans le menu de la vue. Les lignes restent des tickets : le générateur ne crée
+pas d'issues parent pour représenter les epics. Le regroupement est une
+préférence de vue à sélectionner dans GitHub.
+
 Pour utiliser un tableau Kanban, choisir la disposition **Board** de la vue
 Backlog dans GitHub, la grouper par **Status**, puis afficher Size, Epic et
 Priority. Le script ne modifie pas les filtres ou regroupements ; il ajoute
-uniquement Epic et Size aux colonnes visibles si nécessaire.
+uniquement Epic et Size aux colonnes visibles si nécessaire. Dans la vue
+**Epics**, choisir **Group by > Epic** pour voir les tickets par epic.
 
 ### Reprendre un import ou utiliser un projet existant
 
