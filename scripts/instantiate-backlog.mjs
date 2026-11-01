@@ -47,12 +47,6 @@ export function validateBacklog(config) {
       config.project.viewName.trim(),
     'Nom de vue manquant.',
   );
-  requireValue(
-    typeof config.project.epicViewName === 'string' &&
-      config.project.epicViewName.trim() &&
-      config.project.epicViewName !== config.project.viewName,
-    'Nom de vue Epic manquant ou identique a la vue Backlog.',
-  );
   if (config.project.backlogColumns !== undefined)
     requireValue(
       Array.isArray(config.project.backlogColumns) &&
@@ -103,8 +97,7 @@ export function validateBacklog(config) {
         (view) =>
           typeof view.name === 'string' &&
           view.name.trim() &&
-          view.name !== config.project.viewName &&
-          view.name !== config.project.epicViewName,
+          view.name !== config.project.viewName,
       ) &&
       config.project.typeViews
         .map((view) => view.type)
@@ -1223,16 +1216,45 @@ export function instantiate(config, options, run = gh, log = console.log) {
   }
 
   const projectArgs = ['--owner', options.owner, '--format', 'json'];
-  const isNew = !options['project-number'];
-  const project = isNew
-    ? json(run, [
+  const projectTitle = `${config.project.title} - ${options.repo.split('/')[1]}`;
+  let project;
+  let isNew = false;
+  if (options['project-number']) {
+    project = json(run, [
+      'project',
+      'view',
+      options['project-number'],
+      ...projectArgs,
+    ]);
+  } else {
+    const listed = json(run, [
+      'project',
+      'list',
+      ...projectArgs,
+      '--limit',
+      '1000',
+    ]);
+    const projects = Array.isArray(listed) ? listed : listed.projects;
+    requireValue(Array.isArray(projects), 'Liste des projets invalide.');
+    const matches = projects.filter(
+      (candidate) => candidate.title === projectTitle,
+    );
+    requireValue(
+      matches.length <= 1,
+      `Plusieurs projets nommes "${projectTitle}" : preciser --project-number.`,
+    );
+    project = matches[0];
+    if (!project) {
+      project = json(run, [
         'project',
         'create',
         ...projectArgs,
         '--title',
-        `${config.project.title} - ${options.repo.split('/')[1]}`,
-      ])
-    : json(run, ['project', 'view', options['project-number'], ...projectArgs]);
+        projectTitle,
+      ]);
+      isNew = true;
+    }
+  }
   requireValue(
     project.id && project.number && project.url,
     'Reponse de projet incomplete.',
@@ -1406,11 +1428,6 @@ export function instantiate(config, options, run = gh, log = console.log) {
         : visibleFields,
     config.project.backlogColumns !== undefined,
   );
-  ensureBacklogView(run, project.id, config.project.epicViewName, log);
-  ensureBacklogColumns(run, project.id, config.project.epicViewName, [
-    visibleFields[0],
-    visibleFields[1],
-  ]);
   if (options['create-issues'])
     ensureTypeViews(
       run,

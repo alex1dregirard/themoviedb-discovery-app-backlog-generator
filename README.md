@@ -52,9 +52,11 @@ d'issues doit être demandée explicitement avec `--create-issues --apply`.
 `--prune` nécessite aussi `--create-issues` ; il ne supprime pas les brouillons.
 
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
-avant d'utiliser `--apply`, qui crée réellement les issues et le projet.
-Pour reprendre un projet existant, ajoutez `--project-number NUMERO` comme
-expliqué ci-dessous.
+avant d'utiliser `--apply`, qui applique la configuration au projet GitHub et
+peut créer un projet ou des tickets selon les options. Sans
+`--project-number`, le script réutilise le projet ouvert dont le titre
+correspond au backlog et au dépôt, s'il existe ; sinon il le crée. Pour choisir
+un autre projet sans ambiguïté, ajoutez `--project-number NUMERO`.
 
 ## Installation et utilisation
 
@@ -89,10 +91,13 @@ Pour reprendre le même projet, conserver son numéro :
 npm run backlog:instantiate -- --repo MON_DEPOT --project-number NUMERO --apply
 ```
 
-Sans numéro, `--apply` crée un nouveau projet. Les relances ne dupliquent pas
-les issues et conservent leur avancement. L'option `--update-existing` remplace
-explicitement leurs titres et descriptions, y compris les modifications
-manuelles, mais conserve les commentaires et champs déjà renseignés.
+Sans numéro, `--apply` recherche un projet ouvert portant le titre généré pour
+le backlog et le dépôt, puis le réutilise ; s'il n'en trouve pas, il crée le
+projet. Si plusieurs projets portent ce titre, préciser `--project-number`.
+Les relances ne dupliquent pas les issues et conservent leur avancement.
+L'option `--update-existing` remplace explicitement les titres et descriptions
+des issues existantes, y compris les modifications manuelles, mais conserve
+les commentaires et champs déjà renseignés.
 `--config chemin/backlog.yaml` permet de fournir une autre configuration.
 La simulation sans `--prune` est locale et n'effectue aucun appel GitHub.
 

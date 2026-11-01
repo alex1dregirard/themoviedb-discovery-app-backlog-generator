@@ -117,11 +117,9 @@ qui continue à déterminer le type natif GitHub ou le label correspondant.
 La configuration `project.typeViews` définit deux vues supplémentaires :
 **Features** et **Bugs**. Elles sont filtrées respectivement avec `type:Feature`
 et `type:Bug` en organisation, ou `label:feature` et `label:bug` sur un dépôt
-personnel. **Backlog** reste la vue globale ; **Epics** fournit une vue dédiée
-aux tickets associés à chaque epic. Les relances ne dupliquent pas ces vues ;
-les filtres de **Features** et **Bugs** sont synchronisés avec la configuration.
-Title, Epic et Size sont visibles dans Backlog, Features et Bugs ; Title et Epic
-sont visibles dans Epics.
+personnel. **Backlog** reste la vue globale. Les relances ne dupliquent pas ces
+vues ; les filtres de **Features** et **Bugs** sont synchronisés avec la
+configuration. Title, Epic et Size sont visibles dans Backlog, Features et Bugs.
 
 ### Estimer en tailles de T-shirt
 
@@ -241,17 +239,10 @@ et sans changer les autres vues. Les configurations anciennes sans cette liste
 conservent le comportement additif précédent. Cette option décrit la visibilité
 enregistrée côté GitHub, pas une vérification visuelle du navigateur.
 
-La vue tabulaire **Epics**, nommée par `project.epicViewName`, affiche **Title**
-et **Epic**. Pour regrouper les tickets dans GitHub, choisir **Group by > Epic**
-dans le menu de la vue. Les lignes restent des tickets : le générateur ne crée
-pas d'issues parent pour représenter les epics. Le regroupement est une
-préférence de vue à sélectionner dans GitHub.
-
 Pour utiliser un tableau Kanban, choisir la disposition **Board** de la vue
 Backlog dans GitHub, la grouper par **Status**, puis afficher Size, Epic et
 Priority. Le script ne modifie pas les filtres ou regroupements ; il ajoute
-uniquement Epic et Size aux colonnes visibles si nécessaire. Dans la vue
-**Epics**, choisir **Group by > Epic** pour voir les tickets par epic.
+uniquement Epic et Size aux colonnes visibles si nécessaire.
 
 ### Reprendre un import ou utiliser un projet existant
 
@@ -262,11 +253,14 @@ commande de reprise. Conserver ce numéro :
 npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --apply
 ```
 
-**Sans `--project-number`, chaque lancement avec `--apply` crée un nouveau
-projet.** Avec le numéro, les issues sont retrouvées par leur marqueur stable,
-y compris celles qui sont fermées. Les issues existantes ne sont ni réouvertes
-ni réécrites. Les champs déjà renseignés, notamment les estimations revues et le
-statut d'avancement, sont conservés ; seuls les champs manquants sont initialisés.
+Sans `--project-number`, le script recherche un projet ouvert portant le titre
+généré à partir du backlog et du dépôt ; il le réutilise s'il en trouve un,
+sinon il crée le projet. Si plusieurs projets portent ce titre, préciser
+`--project-number` pour choisir. Avec le numéro, les issues sont retrouvées par
+leur marqueur stable, y compris celles qui sont fermées. Les issues existantes
+ne sont ni réouvertes ni réécrites. Les champs déjà renseignés, notamment les
+estimations revues et le statut d'avancement, sont conservés ; seuls les champs
+manquants sont initialisés.
 
 Pour un projet préexistant créé autrement, ajouter d'abord l'option **Backlog**
 au champ natif **Status**. Les champs personnalisés existants doivent avoir les
