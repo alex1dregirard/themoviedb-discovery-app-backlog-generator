@@ -103,6 +103,12 @@ déclarent `scope: backend`. À l'import, le générateur crée ou complète le 
 GitHub **scope** avec ces deux options et le rend visible dans Backlog.
 Le générateur applique la palette **backend bleu**, **frontend violet**,
 en conservant les identifiants des options et leurs descriptions.
+Priority utilise **P1 rouge**, **P2 orange**, **P3 jaune**. Epic colore les
+options connues encore grises : EXP et DATABASE en vert, DASH et DASHBOARD en
+bleu, COMP en violet, HIST en jaune, REC en rose, WATCH en orange, BUG en rouge
+et REL en gris. Les couleurs Epic déjà personnalisées et les options inconnues
+sont conservées. GitHub propose huit couleurs pour dix epics : certaines
+couleurs sont donc partagées.
 Il initialise la valeur des tickets sans remplacer un périmètre déjà renseigné.
 Les configurations sans `scope` restent compatibles et n'imposent aucun
 périmètre. Cette propriété est distincte de `type: feature` ou `type: bug`,

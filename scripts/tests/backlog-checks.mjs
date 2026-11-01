@@ -815,6 +815,28 @@ function fixture({
             },
           },
         });
+      if (
+        /options\s*\{\s*id\s+name\s+color\s+description\s*\}/.test(
+          payload.query,
+        )
+      ) {
+        const field = fields.find((field) => field.id === payload.variables.id);
+        if (field?.options)
+          return JSON.stringify({
+            data: {
+              node: {
+                options: field.options.map((option) => ({
+                  ...option,
+                  color:
+                    { P1: 'RED', P2: 'ORANGE', P3: 'YELLOW', WATCH: 'ORANGE' }[
+                      option.name
+                    ] ?? 'GRAY',
+                  description: '',
+                })),
+              },
+            },
+          });
+      }
       if (payload.query.includes('visibleFields(first: 100)'))
         return JSON.stringify({
           data: {
@@ -1724,6 +1746,58 @@ test('Size palette preserves option IDs, descriptions and custom options and app
     original.map(({ id, name, description }) => ({ id, name, description })),
   );
   assert.deepEqual(sizeOptions.at(-1), original.at(-1));
+});
+
+test('Priority and Epic palettes preserve identities, custom colors and rerun without writes', () => {
+  const { small, run, options } = fixture({ existing: true });
+  const palettes = {
+    priority: ['P1', 'P2', 'P3', 'custom'].map((name) => ({
+      id: `priority-${name}`,
+      name,
+      color: 'GRAY',
+      description: name,
+    })),
+    epic: ['DASHBOARD', 'EXP', 'COMP', 'custom'].map((name) => ({
+      id: `epic-${name}`,
+      name,
+      color: name === 'COMP' || name === 'custom' ? 'PINK' : 'GRAY',
+      description: name,
+    })),
+  };
+  const original = structuredClone(palettes);
+  let changes = 0;
+  function colors(args, input) {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (palettes[variables.id]) {
+        if (query.includes('updateProjectV2Field')) {
+          palettes[variables.id] = variables.options;
+          changes++;
+          return JSON.stringify({ data: { updateProjectV2Field: {} } });
+        }
+        return JSON.stringify({
+          data: { node: { options: palettes[variables.id] } },
+        });
+      }
+    }
+    return run(args, input);
+  }
+  instantiate(small, options, colors, () => {});
+  instantiate(small, options, colors, () => {});
+  assert.equal(changes, 2);
+  assert.deepEqual(
+    palettes.priority.map((o) => o.color),
+    ['RED', 'ORANGE', 'YELLOW', 'GRAY'],
+  );
+  assert.deepEqual(
+    palettes.epic.map((o) => o.color),
+    ['BLUE', 'GREEN', 'PINK', 'PINK'],
+  );
+  for (const id of ['priority', 'epic'])
+    assert.deepEqual(
+      palettes[id].map(({ color, ...option }) => option),
+      original[id].map(({ color, ...option }) => option),
+    );
 });
 
 test('bug tickets require reproduction and render steps in the issue body', () => {

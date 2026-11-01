@@ -11,6 +11,23 @@ const defaultConfig = new URL(
   import.meta.url,
 );
 const fieldNames = ['Size', 'Epic', 'Priority'];
+const priorityPalette = [
+  { name: 'P1', color: 'RED' },
+  { name: 'P2', color: 'ORANGE' },
+  { name: 'P3', color: 'YELLOW' },
+];
+const epicPalette = [
+  { name: 'EXP', color: 'GREEN' },
+  { name: 'DASH', color: 'BLUE' },
+  { name: 'COMP', color: 'PURPLE' },
+  { name: 'HIST', color: 'YELLOW' },
+  { name: 'REC', color: 'PINK' },
+  { name: 'WATCH', color: 'ORANGE' },
+  { name: 'REL', color: 'GRAY' },
+  { name: 'BUG', color: 'RED' },
+  { name: 'DATABASE', color: 'GREEN' },
+  { name: 'DASHBOARD', color: 'BLUE' },
+];
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -541,7 +558,13 @@ function extendSelectField(run, field, names, log) {
   );
 }
 
-function ensureSelectColors(run, fieldId, palette, fieldName) {
+function ensureSelectColors(
+  run,
+  fieldId,
+  palette,
+  fieldName,
+  preserveColors = false,
+) {
   const data = graphql(
     run,
     `
@@ -566,7 +589,9 @@ function ensureSelectColors(run, fieldId, palette, fieldName) {
   );
   const options = data.node.options.map((option) => {
     const entry = palette.find((candidate) => candidate.name === option.name);
-    return entry ? { ...option, color: entry.color } : option;
+    return entry && (!preserveColors || option.color === 'GRAY')
+      ? { ...option, color: entry.color }
+      : option;
   });
   if (
     options.every(
@@ -1067,6 +1092,10 @@ export function instantiate(config, options, run = gh, log = console.log) {
     return field.id;
   });
   ensureSelectColors(run, visibleFields[2], config.sizes, 'Size');
+  const priorityField = fields.find((field) => field.name === 'Priority');
+  requireValue(priorityField?.id, 'Champ Priority absent.');
+  ensureSelectColors(run, priorityField.id, priorityPalette, 'Priority');
+  ensureSelectColors(run, visibleFields[1], epicPalette, 'Epic', true);
   const scopeField = fields.find((field) => field.name === 'scope');
   requireValue(
     !allTickets.some((ticket) => ticket.scope !== undefined) || scopeField?.id,
