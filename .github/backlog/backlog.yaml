@@ -236,6 +236,240 @@ epics:
         definitionOfDone:
           - Le module dédié aux films est implémenté pour gérer la mise à jour des films, genres et pays à partir des APIs mises en place.
           - Des tests couvrent la mise à jour des films, genres et pays à partir des APIs mises en place.
+      - id: DASHBOARD-11
+        key: DASHBOARD-11
+        type: feature
+        scope: frontend
+        title: Afficher la page de tableau de bord des films sans widgets dans un premier temps
+        story: |
+          En tant qu'utilisateur, je veux pouvoir accéder à la page de tableau de bord des films même si aucun widget n'est encore configuré afin de visualiser les informations de base.
+        size: M
+        priority: P3
+        dependsOn: []
+        acceptance:
+          - La page de tableau de bord des films est accessible sans widgets.
+        definitionOfDone:
+          - La page de tableau de bord des films est implémentée et accessible sans widgets.
+          - Des tests couvrent l'affichage de la page de tableau de bord des films sans widgets.
+      - id: DASHBOARD-12
+        key: DASHBOARD-12
+        type: feature
+        scope: frontend
+        title: Mise en oeuvre du storybook pour pouvoir visualiser les futurs widgets et leurs différents états
+        story: |
+          En tant qu'utilisateur, je veux pouvoir visualiser les futurs widgets et leurs différents états dans le storybook afin de faciliter le développement et la validation des composants.
+        size: S
+        priority: P3
+        dependsOn: []
+        acceptance:
+          - Le storybook se lance correctement.
+        definitionOfDone:
+          - Le storybook se lance correctement.
+          - La documentation d'utilisation du storybook est disponible et à jour.
+      - id: DASHBOARD-13
+        key: DASHBOARD-13
+        type: feature
+        scope: frontend
+        title: Widget "Films en base"
+        story: |
+          En tant qu'utilisateur, je veux pouvoir voir le widget "Films en base" sur la page de tableau de bord des films afin d'accéder rapidement aux informations sur les films disponibles.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget "Films en base" est affiché dans le storybook.
+          - Les différents états du widget "Films en base" sont correctement rendus dans le storybook.
+        definitionOfDone:
+          - Le storybook affiche le widget "Films en base".
+          - Des tests couvrent l'affichage du widget "Films en base" dans le storybook.
+      - id: DASHBOARD-14
+        key: DASHBOARD-14
+        type: feature
+        scope: frontend
+        title: Widget "Durée moyenne"
+        story: |
+          En tant qu'utilisateur, je veux consulter la durée moyenne des films du catalogue pour comprendre leur format.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche le libellé "Durée moyenne", la valeur fournie et l'unité min, conformément à la maquette.
+          - Le composant reçoit une valeur calculée sur les durées valides ; une donnée absente ne devient pas arbitrairement zéro.
+          - Storybook présente les états nominal, chargement, absence de données et erreur ; les libellés restent accessibles et lisibles sur mobile.
+        definitionOfDone:
+          - Le widget est disponible dans Storybook avec ses différents états et une démonstration utilisant 107 min.
+          - Des tests vérifient la valeur, l'unité et les états sans données ; les propriétés du composant sont documentées.
+      - id: DASHBOARD-15
+        key: DASHBOARD-15
+        type: feature
+        scope: frontend
+        title: Widget "Note moyenne"
+        story: |
+          En tant qu'utilisateur, je veux consulter la note moyenne des films pour apprécier la qualité du catalogue.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche le libellé "Note moyenne", la valeur fournie avec deux décimales et l'échelle / 10.
+          - La moyenne simple est distinguée d'une note pondérée ; le composant ne calcule pas une moyenne sur une seule page de films.
+          - Storybook présente les états nominal, chargement, absence de notes et erreur ; une absence de note est distincte de zéro.
+        definitionOfDone:
+          - Le widget et ses états sont disponibles dans Storybook avec un exemple affichant 6,78 / 10.
+          - Des tests vérifient le format français, l'échelle et les états sans notes ; les propriétés sont documentées.
+      - id: DASHBOARD-16
+        key: DASHBOARD-16
+        type: feature
+        scope: frontend
+        title: Widget "Pays le plus représenté"
+        story: |
+          En tant qu'utilisateur, je veux identifier le pays le plus représenté et le nombre de films associés pour situer l'origine du catalogue.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche son libellé, le nom du pays fourni et son nombre de films avec l'unité films.
+          - Les noms longs restent lisibles ; les associations multiples de pays ne sont pas recomptées par le composant.
+          - Storybook couvre le cas nominal, un pays au nom long, chargement, aucun pays connu et erreur.
+        definitionOfDone:
+          - Le widget est disponible dans Storybook avec l'exemple United States of America et 725 films.
+          - Des tests vérifient nom, effectif, unité et états sans données ; les propriétés sont documentées.
+      - id: DASHBOARD-17
+        key: DASHBOARD-17
+        type: feature
+        scope: frontend
+        title: Widget "Film le mieux noté"
+        story: |
+          En tant qu'utilisateur, je veux identifier le film le mieux noté pour découvrir un titre apprécié.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - La carte affiche son libellé, l'affiche, le titre, l'année et la note du film fourni avec l'échelle / 10.
+          - Une affiche absente ou inaccessible utilise un remplacement explicite ; un titre long et une année inconnue restent lisibles.
+          - Storybook couvre le cas nominal, affiche absente, chargement, aucun film noté et erreur ; l'image et les informations sont accessibles.
+        definitionOfDone:
+          - La carte et ses états sont disponibles dans Storybook avec une note de démonstration de 9,1 / 10.
+          - Des tests vérifient les informations du film, le format de note et le remplacement d'affiche ; les propriétés sont documentées.
+      - id: DASHBOARD-18
+        key: DASHBOARD-18
+        type: feature
+        scope: frontend
+        title: Widget "Film le plus populaire"
+        story: |
+          En tant qu'utilisateur, je veux identifier le film le plus populaire pour découvrir le titre qui suscite le plus d'intérêt.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - La carte affiche son libellé, l'affiche, le titre, l'année et l'indice de popularité du film fourni.
+          - La popularité est présentée avec deux décimales et son libellé, sans la confondre avec une note sur 10 ou un nombre de votes.
+          - Storybook couvre le cas nominal, affiche absente, valeur inconnue, chargement et erreur ; les titres longs restent lisibles.
+        definitionOfDone:
+          - La carte est disponible dans Storybook avec l'exemple 1 036,49 popularité et ses états.
+          - Des tests vérifient le format, le libellé et les états incomplets ; les propriétés sont documentées.
+      - id: DASHBOARD-19
+        key: DASHBOARD-19
+        type: feature
+        scope: frontend
+        title: Widget "Film le plus rentable"
+        story: |
+          En tant qu'utilisateur, je veux identifier le film présentant le meilleur retour sur investissement pour comparer sa rentabilité.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - La carte affiche son libellé, l'affiche, le titre, l'année et le ROI fourni en pourcentage avec deux décimales.
+          - La formule du ROI et les règles d'éligibilité des budgets et recettes doivent être validées et documentées avant intégration aux données réelles ; ce ticket ne les déduit pas de la capture.
+          - Le composant consomme le résultat fourni sans calculer ni classer les films ; une valeur inconnue n'est pas présentée comme zéro.
+          - Storybook couvre le cas nominal, affiche absente, aucun film éligible, chargement et erreur.
+        definitionOfDone:
+          - La carte est disponible dans Storybook avec un exemple de 69 667,36 % ROI et ses états.
+          - Des tests vérifient titre, année, pourcentage et données absentes ; le contrat des propriétés et la règle de ROI validée sont documentés.
+      - id: DASHBOARD-20
+        key: DASHBOARD-20
+        type: feature
+        scope: frontend
+        title: Widget "Film le moins rentable"
+        story: |
+          En tant qu'utilisateur, je veux identifier le film présentant le plus faible retour sur investissement pour repérer les pertes.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - La carte affiche son libellé, l'affiche, le titre, l'année et le ROI fourni en pourcentage ; le signe négatif est conservé.
+          - La formule du ROI et les règles d'éligibilité doivent être identiques à celles du widget le plus rentable et validées avant intégration réelle.
+          - Storybook couvre un ROI de -100 %, une valeur nulle valide, une valeur inconnue, affiche absente, chargement et erreur.
+        definitionOfDone:
+          - La carte et ses états sont disponibles dans Storybook avec l'exemple -100 % ROI.
+          - Des tests distinguent ROI négatif, zéro et absence de valeur ; le contrat des propriétés est documenté.
+      - id: DASHBOARD-21
+        key: DASHBOARD-21
+        type: feature
+        scope: frontend
+        title: Widget "Genres représentés"
+        story: |
+          En tant qu'utilisateur, je veux connaître le nombre de genres représentés pour apprécier la diversité du catalogue.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche "Genres représentés", "Diversité du catalogue" et le nombre de genres distincts fourni avec l'unité genres.
+          - Une valeur zéro valide est distinguée d'une donnée inconnue ; le composant ne compte pas les associations film-genre.
+          - Storybook couvre le cas nominal, zéro genre, chargement et erreur ; le rendu reste lisible sur mobile.
+        definitionOfDone:
+          - Le widget est disponible dans Storybook avec l'exemple 19 genres et ses états.
+          - Des tests vérifient libellés, effectif et distinction entre zéro et absence ; les propriétés sont documentées.
+      - id: DASHBOARD-22
+        key: DASHBOARD-22
+        type: feature
+        scope: frontend
+        title: Widget "Genre dominant"
+        story: |
+          En tant qu'utilisateur, je veux identifier le genre le plus présent et son effectif pour comprendre la tendance du catalogue.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche "Genre dominant", le nom du genre fourni et son nombre de films avec l'unité films.
+          - Le composant affiche le résultat fourni sans recompter les films multigenres ; un nom long reste lisible.
+          - Storybook couvre le cas nominal, aucun genre connu, chargement et erreur.
+        definitionOfDone:
+          - Le widget et ses états sont disponibles dans Storybook avec Drame et 322 films.
+          - Des tests vérifient nom, nombre, unité et états incomplets ; les propriétés sont documentées.
+      - id: DASHBOARD-23
+        key: DASHBOARD-23
+        type: feature
+        scope: frontend
+        title: Widget "Meilleure note" par genre
+        story: |
+          En tant qu'utilisateur, je veux connaître le genre ayant la meilleure note moyenne pour comparer les genres du catalogue.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche "Meilleure note", le nom du genre fourni et sa note moyenne avec deux décimales et l'échelle / 10.
+          - Cette valeur est explicitement une moyenne simple, distincte de la note pondérée ; un genre sans notes valides n'est pas affiché comme noté zéro.
+          - Storybook couvre le cas nominal, genre sans note, nom long, chargement et erreur.
+        definitionOfDone:
+          - Le widget est disponible dans Storybook avec Animation et 7,41 / 10.
+          - Des tests vérifient genre, format et états sans notes ; les propriétés sont documentées.
+      - id: DASHBOARD-24
+        key: DASHBOARD-24
+        type: feature
+        scope: frontend
+        title: Widget "Meilleure note pondérée" par genre
+        story: |
+          En tant qu'utilisateur, je veux connaître le genre ayant la meilleure note pondérée afin de disposer d'un indicateur distinct de la moyenne simple.
+        size: S
+        priority: P3
+        dependsOn: [DASHBOARD-12]
+        acceptance:
+          - Le widget affiche "Meilleure note pondérée", le genre fourni et sa note avec deux décimales et l'échelle / 10.
+          - La formule de pondération, ses paramètres et l'éligibilité des genres doivent être validés et documentés avant intégration réelle ; aucune formule n'est déduite de la capture.
+          - Le composant affiche la valeur fournie sans appliquer une pondération arbitraire ; les états sans résultat, chargement et erreur sont explicites.
+        definitionOfDone:
+          - Le widget est disponible dans Storybook avec Animation et 7,68 / 10 ainsi que ses états.
+          - Des tests vérifient libellé, format et données absentes ; le contrat des propriétés et la formule validée sont documentés.
       # - id: DASHBOARD-04
       #   key: EXPL-COUNTRIES-CSV
       #   type: feature
