@@ -135,7 +135,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
         size: M
-        priority: P1
+        priority: P3
         dependsOn: [DASHBOARD-03]
         acceptance:
           - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
@@ -163,13 +163,69 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
         size: M
-        priority: P1
+        priority: P3
         dependsOn: [DASHBOARD-02]
         acceptance:
           - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
         definitionOfDone:
           - Le module dédié aux pays est implémenté pour gérer l'importation depuis un fichier CSV.
-
+      - id: DASHBOARD-07
+        key: DASHBOARD-07
+        type: feature
+        title: Consommer et exposer l'API discover
+        story: |
+          En tant que gestionnaire de la base de données des films, je veux pouvoir consommer et exposer l'API discover afin de récupérer les films d'une année donnée.
+        size: M
+        priority: P2
+        dependsOn: []
+        acceptance:
+          - L'API discover est consommée pour récupérer les films d'une année donnée.
+          - Les films récupérés sont exposés via une API interne.
+        definitionOfDone:
+          - L'intégration avec l'API discover est implémentée.
+          - Des tests couvrent la récupération et l'exposition des films.
+      - id: DASHBOARD-08
+        key: DASHBOARD-08
+        type: feature
+        title: Créer et mettre à jour les films
+        story: |
+          En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les films afin de maintenir une liste de films cohérente et à jour.
+        size: M
+        priority: P3
+        dependsOn: []
+        acceptance:
+          - Un module dédié permet de rechercher un film par identifiant, de lister les films triés par identifiant et d'insérer ou actualiser leurs informations.
+        definitionOfDone:
+          - Le module dédié aux films est implémenté pour gérer la création et la mise à jour des films.
+          - Des tests couvrent la création et la mise à jour des films.
+      - id: DASHBOARD-09
+        key: DASHBOARD-09
+        type: feature
+        title: Importer et mettre à jour les films à partir d'un fichier CSV
+        story: |
+          En tant que gestionnaire de la base de données des films, je veux pouvoir importer et mettre à jour les films à partir d'un fichier CSV afin de maintenir une liste de films cohérente et à jour.
+        size: M
+        priority: P3
+        dependsOn: []
+        acceptance:
+          - Un module dédié permet d'importer les films depuis un fichier CSV et de mettre à jour leurs informations.
+        definitionOfDone:
+          - Le module dédié aux films est implémenté pour gérer l'importation et la mise à jour des films à partir d'un fichier CSV.
+          - Des tests couvrent l'importation et la mise à jour des films à partir d'un fichier CSV.
+      - id: DASHBOARD-10
+        key: DASHBOARD-10
+        type: feature
+        title: Mettre en place le service permettant de mettre à jour les films, genres et pays à partir des APIs mises en place
+        story: |
+          En tant que gestionnaire de la base de données des films, je veux pouvoir mettre à jour les films, genres et pays à partir des APIs mises en place afin de maintenir une liste de films cohérente et à jour.
+        size: M
+        priority: P3
+        dependsOn: []
+        acceptance:
+          - Un module dédié permet de mettre à jour les films, genres et pays à partir des APIs mises en place.
+        definitionOfDone:
+          - Le module dédié aux films est implémenté pour gérer la mise à jour des films, genres et pays à partir des APIs mises en place.
+          - Des tests couvrent la mise à jour des films, genres et pays à partir des APIs mises en place.
       # - id: DASHBOARD-04
       #   key: EXPL-COUNTRIES-CSV
       #   type: feature
