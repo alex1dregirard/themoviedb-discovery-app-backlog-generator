@@ -7,6 +7,7 @@ import {
   issueBody,
   marker,
   parseOptions,
+  syncDependencies,
   validateBacklog,
 } from '../instantiate-backlog.mjs';
 
@@ -38,12 +39,14 @@ const config = {
             ? [`WATCH-0${number - 1}`]
             : [],
       acceptance: ['Un resultat observable est verifie.'],
+      definitionOfDone: ['Le resultat du ticket est relu et demontre.'],
       ...(id === 'BUG'
         ? { reproduction: ['Declencher le defaut et observer le resultat.'] }
         : {}),
     })),
   })),
 };
+delete config.project.backlogColumns;
 
 test('backlog accepts a growing set of ideas with unique tickets', () => {
   validateBacklog(configuredBacklog);
@@ -52,6 +55,51 @@ test('backlog accepts a growing set of ideas with unique tickets', () => {
     new Set(tickets.map((ticket) => ticket.id)).size,
     tickets.length,
   );
+});
+
+test('DASHBOARD preserves the stable keys of the former EXPL issues', () => {
+  const epic = configuredBacklog.epics.find(
+    (candidate) => candidate.id === 'DASHBOARD',
+  );
+  assert.ok(epic);
+  assert.deepEqual(
+    epic.tickets.slice(0, 6).map((ticket) => ticket.key),
+    [
+      'EXPL-01',
+      'EXPL-02',
+      'EXPL-GENRES',
+      'EXPL-GENRES-CSV',
+      'EXPL-COUNTRIES-CSV',
+      'EXPL-COUNTRIES-CSV-IMPORT',
+    ],
+  );
+  for (const ticket of epic.tickets) {
+    assert.ok(ticket.id.startsWith('DASHBOARD-'));
+    assert.ok(ticket.dependsOn.every((id) => id.startsWith('DASHBOARD-')));
+  }
+});
+
+test('each ticket requires its own nonempty Definition of Done', () => {
+  for (const definitionOfDone of [undefined, null, [], [''], [' '], [42]]) {
+    const invalid = structuredClone(config);
+    invalid.epics[0].tickets[0].definitionOfDone = definitionOfDone;
+    assert.throws(() => validateBacklog(invalid), /Definition of Done/);
+  }
+  const epic = config.epics[0];
+  const first = {
+    ...epic.tickets[0],
+    definitionOfDone: ['Premier livrable verifie.'],
+  };
+  const second = {
+    ...epic.tickets[1],
+    definitionOfDone: ['Second livrable demontre.'],
+  };
+  const firstBody = issueBody(epic, first, config, new Map());
+  const secondBody = issueBody(epic, second, config, new Map());
+  assert.ok(firstBody.includes('- [ ] Premier livrable verifie.'));
+  assert.ok(!firstBody.includes('Second livrable demontre.'));
+  assert.ok(secondBody.includes('- [ ] Second livrable demontre.'));
+  assert.ok(!secondBody.includes('Premier livrable verifie.'));
 });
 
 test('milestones are optional, unique and referenced by title', () => {
@@ -73,6 +121,14 @@ test('milestones are optional, unique and referenced by title', () => {
       () => validateBacklog({ ...valid, milestones }),
       /milestone/i,
     );
+  }
+});
+
+test('epic view name is required and unique from other project views', () => {
+  for (const epicViewName of ['', 'Backlog', 'Features', 'Bugs']) {
+    const invalid = structuredClone(configuredBacklog);
+    invalid.project.epicViewName = epicViewName;
+    assert.throws(() => validateBacklog(invalid), /vue/i);
   }
 });
 
@@ -183,8 +239,8 @@ test('invalid sizing, priorities, stories and criteria are rejected', () => {
     assert.throws(() => validateBacklog(invalid));
   }
   const invalid = structuredClone(config);
-  invalid.sizes[1].weight = invalid.sizes[0].weight;
-  assert.throws(() => validateBacklog(invalid), /poids/);
+  invalid.sizes[1].color = 'INVALID';
+  assert.throws(() => validateBacklog(invalid), /couleurs/);
 });
 
 test('unknown dependencies, duplicated identifiers and cycles are rejected', () => {
@@ -329,6 +385,10 @@ test('renumbering keeps existing issue identity and dependencies across reruns',
 test('target is explicit and writes require --apply', () => {
   const options = parseOptions(['--repo', 'movies', '--owner', 'student']);
   assert.equal(options.apply, false);
+  const defaultOwner = parseOptions(['--repo', 'movies']);
+  assert.equal(defaultOwner.repo, 'movies');
+  assert.equal(defaultOwner.owner, undefined);
+  assert.equal(defaultOwner.apply, false);
   assert.throws(
     () => parseOptions(['--repo', 'org/movies', '--owner', 'student']),
     /sans proprietaire/,
@@ -349,6 +409,31 @@ test('target is explicit and writes require --apply', () => {
   assert.throws(() => parseOptions(['--apply', '--dry-run']), /combiner/);
 });
 
+test('authenticated user is the default owner when --owner is omitted', () => {
+  const f = fixture();
+  const options = parseOptions(['--repo', 'movies', '--apply']);
+  options['create-issues'] = true;
+  const calls = [];
+  const run = (args, input) => {
+    calls.push(args);
+    if (args[0] === 'api' && args[1] === 'user')
+      return JSON.stringify({ login: 'student' });
+    return f.run(args, input);
+  };
+  instantiate(f.small, options, run, () => {});
+  assert.ok(
+    calls.some((args) => args[0] === 'repo' && args[2] === 'student/movies'),
+  );
+  assert.ok(
+    calls.some(
+      (args) =>
+        args[0] === 'project' &&
+        args.includes('--owner') &&
+        args.includes('student'),
+    ),
+  );
+});
+
 test('simulation performs no GitHub calls and displays every ticket in Backlog', () => {
   const output = [];
   instantiate(
@@ -363,7 +448,294 @@ test('simulation performs no GitHub calls and displays every ticket in Backlog',
   );
 });
 
-test('issue body includes story, size, weight, criteria, dependency URLs and Done', () => {
+test('scope supports backend/frontend and remains optional for older configurations', () => {
+  validateBacklog(config);
+  assert.ok(
+    configuredBacklog.epics
+      .flatMap((epic) => epic.tickets)
+      .every((ticket) => ['backend', 'frontend'].includes(ticket.scope)),
+  );
+  for (const scope of ['backend', 'frontend']) {
+    const f = fixture();
+    f.small.epics[0].tickets[0].scope = scope;
+    const field = {
+      id: 'scope',
+      name: 'scope',
+      options: [
+        { id: 'backend', name: 'backend', color: 'GRAY', description: 'API' },
+        { id: 'frontend', name: 'frontend', color: 'GRAY', description: 'UI' },
+        { id: 'custom', name: 'other', color: 'GREEN', description: 'Custom' },
+      ],
+    };
+    const originalOptions = structuredClone(field.options);
+    let paletteChanges = 0;
+    const edits = [];
+    const run = (args, input) => {
+      if (args[1] === 'graphql') {
+        const { query, variables } = JSON.parse(input);
+        if (variables.id === 'scope') {
+          if (query.includes('updateProjectV2Field')) {
+            field.options = variables.options;
+            paletteChanges++;
+            return JSON.stringify({ data: { updateProjectV2Field: {} } });
+          }
+          return JSON.stringify({ data: { node: { options: field.options } } });
+        }
+      }
+      if (args[1] === 'field-list') {
+        const result = JSON.parse(f.run(args, input));
+        result.fields.push(field);
+        return JSON.stringify(result);
+      }
+      if (args[1] === 'item-edit' && args.includes('scope')) edits.push(args);
+      if (
+        args[1] === 'graphql' &&
+        JSON.parse(input).query.includes('visibleFields(first: 100)')
+      ) {
+        const result = JSON.parse(f.run(args, input));
+        const view = result.data.node.views.nodes.find(
+          (view) => view.name === 'Backlog',
+        );
+        view.configuration.visibleFields.nodes.push({ id: 'scope' });
+        return JSON.stringify(result);
+      }
+      return f.run(args, input);
+    };
+    instantiate(f.small, f.options, run, () => {});
+    assert.equal(edits.length, 1);
+    assert.ok(edits[0].includes(scope));
+    instantiate(f.small, f.options, run, () => {});
+    assert.equal(paletteChanges, 1);
+    assert.deepEqual(
+      field.options,
+      originalOptions.map((option) => ({
+        ...option,
+        color:
+          { backend: 'BLUE', frontend: 'PURPLE' }[option.name] ?? option.color,
+      })),
+    );
+  }
+  for (const scope of ['feature', '', null, 42]) {
+    const invalid = structuredClone(config);
+    invalid.epics[0].tickets[0].scope = scope;
+    assert.throws(() => validateBacklog(invalid), /scope/);
+  }
+});
+
+test('Backlog configured columns are exact, ordered and do not change other views', () => {
+  const f = fixture({ existing: true });
+  f.small.project.backlogColumns = ['Title', 'Priority', 'Status'];
+  const updates = [];
+  const run = (args, input) => {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('updateProjectV2View')) updates.push(variables);
+    }
+    return f.run(args, input);
+  };
+  instantiate(f.small, f.options, run, () => {});
+  assert.deepEqual(updates, [
+    { id: 'view', fields: ['title', 'priority', 'status'] },
+  ]);
+  for (const columns of [
+    [],
+    ['Priority'],
+    ['Title', 'Title'],
+    ['Title', ''],
+    ['Title', 42],
+    'Title',
+  ]) {
+    const invalid = structuredClone(config);
+    invalid.project.backlogColumns = columns;
+    assert.throws(() => validateBacklog(invalid), /backlogColumns/);
+  }
+  f.small.project.backlogColumns = ['Title', 'Missing'];
+  assert.throws(
+    () => instantiate(f.small, f.options, run, () => {}),
+    /Colonne Backlog inconnue/,
+  );
+});
+
+test('dependsOn text reflects YAML dependencies and clears obsolete values', () => {
+  const calls = [];
+  const run = (args) => calls.push(args);
+  const fields = [{ id: 'dependencies', name: 'dependsOn' }];
+  syncDependencies(run, 'project', 'item', fields, {
+    dependsOn: ['DASHBOARD-01', 'DASHBOARD-12'],
+  });
+  assert.deepEqual(calls[0].slice(-2), [
+    '--text',
+    'DASHBOARD-01, DASHBOARD-12',
+  ]);
+  syncDependencies(run, 'project', 'item', fields, { dependsOn: [] });
+  assert.equal(calls[1].at(-1), '--clear');
+  syncDependencies(run, 'project', 'item', [], { dependsOn: [] });
+  assert.equal(calls.length, 2);
+});
+
+test('prune requires an existing project number', () => {
+  assert.throws(
+    () => parseOptions(['--repo', 'movies', '--prune']),
+    /--project-number/,
+  );
+});
+
+test('prune only closes obsolete generated issues in the targeted project and is repeatable', () => {
+  for (const apply of [false, true]) {
+    const f = fixture({ existing: true });
+    const obsolete = {
+      number: 99,
+      body: marker('OLD-01'),
+      state: 'open',
+      html_url: 'https://github.com/student/movies/issues/99',
+    };
+    const alreadyClosed = {
+      ...obsolete,
+      number: 98,
+      state: 'closed',
+      body: marker('OLD-02'),
+      html_url: 'https://github.com/student/movies/issues/98',
+    };
+    const unrelated = {
+      ...obsolete,
+      number: 97,
+      body: 'Manual issue',
+      html_url: 'manual',
+    };
+    const outside = {
+      ...obsolete,
+      number: 96,
+      body: marker('OLD-03'),
+      html_url: 'outside',
+    };
+    const ambiguous = {
+      ...obsolete,
+      number: 95,
+      body: `${marker('OLD-04')}\n${marker('OLD-05')}`,
+      html_url: 'ambiguous',
+    };
+    const items = new Map(
+      [obsolete, alreadyClosed, unrelated, ambiguous].map((issue) => [
+        issue.html_url,
+        {
+          id: `item-${issue.number}`,
+          content: { url: issue.html_url },
+          fieldValues: { nodes: [] },
+        },
+      ]),
+    );
+    const writes = [];
+    const run = (args, input) => {
+      if (args[1]?.includes('/issues?')) {
+        const original = JSON.parse(f.run(args, input)).flat();
+        return JSON.stringify([
+          original,
+          [obsolete, alreadyClosed, unrelated, outside, ambiguous],
+        ]);
+      }
+      if (
+        args.includes('PATCH') &&
+        args[1] === 'repos/student/movies/issues/99'
+      ) {
+        writes.push('close');
+        obsolete.state = 'closed';
+        assert.deepEqual(JSON.parse(input), { state: 'closed' });
+        return JSON.stringify(obsolete);
+      }
+      if (args[1] === 'graphql') {
+        const { query, variables } = JSON.parse(input);
+        if (query.includes('deleteProjectV2Item')) {
+          writes.push(variables.item);
+          const entry = [...items].find(
+            ([, item]) => item.id === variables.item,
+          );
+          assert.ok(entry);
+          items.delete(entry[0]);
+          return JSON.stringify({
+            data: { deleteProjectV2Item: { deletedItemId: variables.item } },
+          });
+        }
+        if (query.includes('items(first: 100')) {
+          const original = JSON.parse(f.run(args, input));
+          original.data.node.items.nodes.push(...items.values());
+          return JSON.stringify(original);
+        }
+      }
+      return f.run(args, input);
+    };
+    const output = [];
+    const options = { ...f.options, apply, prune: true, 'project-number': '7' };
+    instantiate(f.small, options, run, (line) => output.push(line));
+    assert.deepEqual(writes, apply ? ['close', 'item-99', 'item-98'] : []);
+    assert.ok(output.some((line) => line.includes('2 ticket(s)')));
+    assert.ok(items.has('manual') && items.has('ambiguous'));
+    if (apply) {
+      instantiate(f.small, options, run, () => {});
+      assert.equal(writes.length, 3);
+    } else {
+      assert.ok(
+        !f.calls.some(
+          ({ args }) => args.includes('POST') || args[1] === 'item-edit',
+        ),
+      );
+    }
+  }
+});
+
+test('prune surfaces closure failures before removing an issue from the project', () => {
+  const f = fixture();
+  let deleted = false;
+  const run = (args, input) => {
+    if (args[1]?.includes('/issues?'))
+      return JSON.stringify([
+        [
+          {
+            number: 99,
+            state: 'open',
+            body: marker('OLD-01'),
+            html_url: 'obsolete',
+          },
+        ],
+      ]);
+    if (args.includes('PATCH') && args[1]?.endsWith('/issues/99'))
+      throw new Error('Closure denied');
+    if (args[1] === 'graphql') {
+      const { query } = JSON.parse(input);
+      if (query.includes('deleteProjectV2Item')) deleted = true;
+      if (query.includes('items(first: 100'))
+        return JSON.stringify({
+          data: {
+            node: {
+              items: {
+                nodes: [
+                  {
+                    id: 'old',
+                    content: { url: 'obsolete' },
+                    fieldValues: { nodes: [] },
+                  },
+                ],
+                pageInfo: { hasNextPage: false },
+              },
+            },
+          },
+        });
+    }
+    return f.run(args, input);
+  };
+  assert.throws(
+    () =>
+      instantiate(
+        f.small,
+        { ...f.options, prune: true, 'project-number': '7' },
+        run,
+        () => {},
+      ),
+    /Closure denied/,
+  );
+  assert.equal(deleted, false);
+});
+
+test('issue body includes story, size, criteria, dependency URLs and Done without weights', () => {
   const epic = config.epics.find((candidate) => candidate.id === 'EXP');
   const ticket = epic.tickets[0];
   const body = issueBody(
@@ -376,7 +748,6 @@ test('issue body includes story, size, weight, criteria, dependency URLs and Don
     marker(ticket.id),
     ticket.story,
     '**Taille : S**',
-    '**Poids relatif : 2**',
     '- [ ]',
     'https://github.com/student/movies/issues/1',
     'Definition of Done',
@@ -384,6 +755,10 @@ test('issue body includes story, size, weight, criteria, dependency URLs and Don
   ]) {
     assert.ok(body.includes(text), text);
   }
+  assert.ok(body.includes(`## ${epic.title}\n\n${epic.objective}`));
+  assert.ok(body.indexOf(`## ${epic.title}`) < body.indexOf('## User story'));
+  assert.ok(!body.includes('## Epic'));
+  assert.ok(!body.includes('Poids'));
 });
 
 function fixture({
@@ -408,7 +783,6 @@ function fixture({
       name: 'Size',
       options: small.sizes.map((size) => ({ id: size.name, name: size.name })),
     },
-    { id: 'weight', name: 'Weight' },
     { id: 'epic', name: 'Epic', options: [{ id: 'WATCH', name: 'WATCH' }] },
     {
       id: 'priority',
@@ -428,10 +802,20 @@ function fixture({
       },
     },
   }));
+  const epicView = {
+    id: 'epic-view',
+    name: configuredBacklog.project.epicViewName,
+    number: 4,
+    configuration: {
+      visibleFields: { nodes: [{ id: 'title' }, { id: 'epic' }] },
+    },
+  };
   function run(args, input) {
     calls.push({ args, input });
     const command = args.slice(0, 2).join(' ');
     if (command === 'auth status' || command === 'project link') return '';
+    if (args[0] === 'api' && args[1] === 'user')
+      return JSON.stringify({ login: 'student' });
     if (command === 'repo view')
       return JSON.stringify({
         hasIssuesEnabled: true,
@@ -485,6 +869,28 @@ function fixture({
             },
           },
         });
+      if (
+        /options\s*\{\s*id\s+name\s+color\s+description\s*\}/.test(
+          payload.query,
+        )
+      ) {
+        const field = fields.find((field) => field.id === payload.variables.id);
+        if (field?.options)
+          return JSON.stringify({
+            data: {
+              node: {
+                options: field.options.map((option) => ({
+                  ...option,
+                  color:
+                    { P1: 'RED', P2: 'ORANGE', P3: 'YELLOW', WATCH: 'ORANGE' }[
+                      option.name
+                    ] ?? 'GRAY',
+                  description: '',
+                })),
+              },
+            },
+          });
+      }
       if (payload.query.includes('visibleFields(first: 100)'))
         return JSON.stringify({
           data: {
@@ -505,6 +911,7 @@ function fixture({
                       },
                     },
                   },
+                  epicView,
                 ],
               },
             },
@@ -517,6 +924,7 @@ function fixture({
               views: {
                 nodes: [
                   { id: 'view', name: 'Backlog', number: 1 },
+                  epicView,
                   ...typeViews,
                 ],
                 pageInfo: { hasNextPage: false },
@@ -574,12 +982,84 @@ function fixture({
       repo: 'student/movies',
       owner: 'student',
       apply: true,
+      'create-issues': true,
       ...(existing ? { 'project-number': '7' } : {}),
     },
   };
 }
 
-test('apply creates issues and assigns Backlog, size, weight, epic and priority', () => {
+test('apply defaults to draft tickets, reuses stable keys and never creates issues', () => {
+  const f = fixture({ existing: true });
+  const draftOptions = { ...f.options, 'create-issues': false };
+  let items = [];
+  let creates = 0;
+  const mutations = [];
+  function drafts(args, input) {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('... on DraftIssue') && query.includes('items(first:'))
+        return JSON.stringify({
+          data: {
+            node: { items: { nodes: items, pageInfo: { hasNextPage: false } } },
+          },
+        });
+      if (query.includes('addProjectV2DraftIssue')) {
+        creates++;
+        const item = {
+          id: 'draft-item',
+          fullDatabaseId: '123',
+          type: 'DRAFT_ISSUE',
+          content: {
+            id: 'draft',
+            title: variables.input.title,
+            body: variables.input.body,
+          },
+          fieldValues: { nodes: [], pageInfo: { hasNextPage: false } },
+        };
+        items.push(item);
+        return JSON.stringify({
+          data: { addProjectV2DraftIssue: { projectItem: item } },
+        });
+      }
+      if (query.includes('updateProjectV2DraftIssue')) {
+        mutations.push(variables.input);
+        Object.assign(items[0].content, variables.input);
+        return JSON.stringify({
+          data: { updateProjectV2DraftIssue: { draftIssue: { id: 'draft' } } },
+        });
+      }
+    }
+    if (args[1] === 'item-edit') {
+      const field = args[args.indexOf('--field-id') + 1];
+      const name = {
+        status: 'Status',
+        size: 'Size',
+        epic: 'Epic',
+        priority: 'Priority',
+      }[field];
+      items[0].fieldValues.nodes.push({ field: { name }, name: 'kept' });
+      return '';
+    }
+    return f.run(args, input);
+  }
+  instantiate(f.small, draftOptions, drafts, () => {});
+  instantiate(f.small, draftOptions, drafts, () => {});
+  assert.equal(creates, 1);
+  assert.ok(!f.calls.some(({ args }) => args.includes('POST')));
+  assert.equal(parseOptions(['--repo', 'movies'])['create-issues'], false);
+  assert.throws(
+    () =>
+      parseOptions(['--repo', 'movies', '--prune', '--project-number', '7']),
+    /--create-issues/,
+  );
+  draftOptions['update-existing'] = true;
+  f.small.epics[0].tickets[0].title = 'Updated draft';
+  instantiate(f.small, draftOptions, drafts, () => {});
+  assert.equal(mutations.length, 1);
+  assert.ok(items[0].content.title.includes('Updated draft'));
+});
+
+test('apply creates issues and assigns Backlog, size, epic and priority', () => {
   const { small, calls, run, options } = fixture();
   instantiate(small, options, run, () => {});
   assert.equal(calls.filter(({ args }) => args.includes('POST')).length, 1);
@@ -587,11 +1067,9 @@ test('apply creates issues and assigns Backlog, size, weight, epic and priority'
   assert.equal(JSON.parse(creation.input).type, 'Feature');
   assert.ok(!Object.hasOwn(JSON.parse(creation.input), 'labels'));
   const edits = calls.filter(({ args }) => args[1] === 'item-edit');
-  assert.equal(edits.length, 5);
+  assert.equal(edits.length, 4);
   assert.ok(edits.some(({ args }) => args.includes('backlog')));
-  assert.ok(
-    edits.some(({ args }) => args.includes('--number') && args.includes('2')),
-  );
+  assert.ok(edits.every(({ args }) => !args.includes('--number')));
   assert.ok(calls.some(({ input }) => input?.includes('updateProjectV2Field')));
 });
 
@@ -659,7 +1137,6 @@ test('new project receives all custom fields with their expected types', () => {
     [...created],
     [
       ['Size', 'SINGLE_SELECT'],
-      ['Weight', 'NUMBER'],
       ['Epic', 'SINGLE_SELECT'],
       ['Priority', 'SINGLE_SELECT'],
     ],
@@ -748,21 +1225,21 @@ test('duplicate issue markers stop the import before creating a project', () => 
   assert.ok(!calls.some(({ args }) => args[0] === 'project'));
 });
 
-test('incompatible existing Weight field fails explicitly before issue creation', () => {
+test('legacy Weight fields are neither validated nor populated', () => {
   const { small, calls, run, options } = fixture({ existing: true });
   function incompatible(args, input) {
     const result = run(args, input);
+    if (args[1] === 'field-list') {
+      const data = JSON.parse(result);
+      data.fields.push({ id: 'legacy-weight', name: 'Weight' });
+      return JSON.stringify(data);
+    }
     if (input && JSON.parse(input).query?.includes('dataType'))
-      return JSON.stringify({ data: { node: { dataType: 'TEXT' } } });
+      assert.fail('Legacy Weight field must not be validated');
     return result;
   }
-  assert.throws(
-    () => instantiate(small, options, incompatible, () => {}),
-    /NUMBER/,
-  );
-  assert.ok(
-    !calls.some(({ args }) => args.includes('POST') || args[1] === 'item-edit'),
-  );
+  instantiate(small, options, incompatible, () => {});
+  assert.ok(!calls.some(({ args }) => args.includes('legacy-weight')));
 });
 
 test('regeneration adds new tickets and epics once without changing existing work', () => {
@@ -898,7 +1375,7 @@ test('regeneration adds new tickets and epics once without changing existing wor
   assert.ok(epic.options.some((option) => option.name === 'NEW'));
   assert.equal(
     mutations.filter((mutation) => mutation.type === 'edit').length,
-    10,
+    8,
   );
   const mutationCount = mutations.length;
   instantiate(small, options, evolving, () => {});
@@ -1216,11 +1693,11 @@ test('default view is renamed to configured Backlog once, without altering its l
   assert.equal(updates.length, 1);
 });
 
-test('custom views are preserved and a missing Backlog view is created', () => {
+test('custom views are preserved and missing Backlog and Epics views are created', () => {
   const { small, run, options } = fixture({ existing: true });
   const views = [{ id: 'custom', name: 'Sprint actuel', number: 1 }];
   const original = structuredClone(views[0]);
-  let creations = 0;
+  const createdNames = [];
   function withCustomView(args, input) {
     if (args[1] === 'graphql') {
       const { query, variables } = JSON.parse(input);
@@ -1232,9 +1709,10 @@ test('custom views are preserved and a missing Backlog view is created', () => {
               views: {
                 nodes: [
                   ...views,
-                  ...(creations
+                  ...(createdNames.length
                     ? JSON.parse(run(args, input)).data.node.views.nodes.filter(
-                        (candidate) => candidate.name !== 'Backlog',
+                        (candidate) =>
+                          !['Backlog', 'Epics'].includes(candidate.name),
                       )
                     : []),
                 ],
@@ -1246,11 +1724,11 @@ test('custom views are preserved and a missing Backlog view is created', () => {
 
       assert.ok(!query.includes('updateProjectV2View'));
       if (query.includes('createProjectV2View')) {
-        assert.equal(variables.name, 'Backlog');
+        assert.ok(['Backlog', 'Epics'].includes(variables.name));
         assert.ok(query.includes('TABLE_LAYOUT'));
         const view = { id: 'new-view', name: variables.name, number: 2 };
         views.push(view);
-        creations++;
+        createdNames.push(variables.name);
         return JSON.stringify({
           data: { createProjectV2View: { projectV2View: view } },
         });
@@ -1261,7 +1739,7 @@ test('custom views are preserved and a missing Backlog view is created', () => {
   instantiate(small, options, withCustomView, () => {});
   instantiate(small, options, withCustomView, () => {});
   assert.deepEqual(views[0], original);
-  assert.equal(creations, 1);
+  assert.deepEqual(createdNames, ['Backlog', 'Epics']);
 });
 
 test('Epic and Size follow Title while other columns keep their relative order', () => {
@@ -1317,6 +1795,38 @@ test('Epic and Size follow Title while other columns keep their relative order',
   assert.equal(updates, 1);
 });
 
+test('Epics view shows Title and Epic and repairs missing Epic column once', () => {
+  const { small, run, options } = fixture({ existing: true });
+  let epicColumns = [{ id: 'title' }];
+  let updates = 0;
+  function epicsView(args, input) {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('visibleFields(first: 100)')) {
+        const result = JSON.parse(run(args, input));
+        const view = result.data.node.views.nodes.find(
+          (candidate) => candidate.name === 'Epics',
+        );
+        view.configuration.visibleFields.nodes = epicColumns;
+        return JSON.stringify(result);
+      }
+      if (query.includes('visibleFieldIds:')) {
+        assert.deepEqual(variables.fields, ['title', 'epic']);
+        epicColumns = variables.fields.map((id) => ({ id }));
+        updates++;
+        return JSON.stringify({
+          data: { updateProjectV2View: { projectV2View: { id: 'epic-view' } } },
+        });
+      }
+    }
+    return run(args, input);
+  }
+  instantiate(small, options, epicsView, () => {});
+  instantiate(small, options, epicsView, () => {});
+  assert.deepEqual(epicColumns, [{ id: 'title' }, { id: 'epic' }]);
+  assert.equal(updates, 1);
+});
+
 test('Size palette preserves option IDs, descriptions and custom options and applies only once', () => {
   const { small, run, options } = fixture({ existing: true });
   let sizeOptions = [
@@ -1362,6 +1872,58 @@ test('Size palette preserves option IDs, descriptions and custom options and app
     original.map(({ id, name, description }) => ({ id, name, description })),
   );
   assert.deepEqual(sizeOptions.at(-1), original.at(-1));
+});
+
+test('Priority and Epic palettes preserve identities, custom colors and rerun without writes', () => {
+  const { small, run, options } = fixture({ existing: true });
+  const palettes = {
+    priority: ['P1', 'P2', 'P3', 'custom'].map((name) => ({
+      id: `priority-${name}`,
+      name,
+      color: 'GRAY',
+      description: name,
+    })),
+    epic: ['DASHBOARD', 'EXP', 'COMP', 'custom'].map((name) => ({
+      id: `epic-${name}`,
+      name,
+      color: name === 'COMP' || name === 'custom' ? 'PINK' : 'GRAY',
+      description: name,
+    })),
+  };
+  const original = structuredClone(palettes);
+  let changes = 0;
+  function colors(args, input) {
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (palettes[variables.id]) {
+        if (query.includes('updateProjectV2Field')) {
+          palettes[variables.id] = variables.options;
+          changes++;
+          return JSON.stringify({ data: { updateProjectV2Field: {} } });
+        }
+        return JSON.stringify({
+          data: { node: { options: palettes[variables.id] } },
+        });
+      }
+    }
+    return run(args, input);
+  }
+  instantiate(small, options, colors, () => {});
+  instantiate(small, options, colors, () => {});
+  assert.equal(changes, 2);
+  assert.deepEqual(
+    palettes.priority.map((o) => o.color),
+    ['RED', 'ORANGE', 'YELLOW', 'GRAY'],
+  );
+  assert.deepEqual(
+    palettes.epic.map((o) => o.color),
+    ['BLUE', 'GREEN', 'PINK', 'PINK'],
+  );
+  for (const id of ['priority', 'epic'])
+    assert.deepEqual(
+      palettes[id].map(({ color: _color, ...option }) => option),
+      original[id].map(({ color: _color, ...option }) => option),
+    );
 });
 
 test('bug tickets require reproduction and render steps in the issue body', () => {
@@ -1499,7 +2061,14 @@ test('Features and Bugs views are created and filtered once for each repository 
     }
     instantiate(small, options, filtered, () => {});
     instantiate(small, options, filtered, () => {});
-    assert.equal(creations, 2);
+    assert.equal(creations, 3);
+    assert.deepEqual(
+      views
+        .slice(1)
+        .map((view) => view.name)
+        .sort(),
+      ['Bugs', 'Epics', 'Features'],
+    );
     assert.deepEqual(
       filters,
       personalRepo

@@ -10,7 +10,24 @@ const defaultConfig = new URL(
   '../.github/backlog/backlog.yaml',
   import.meta.url,
 );
-const fieldNames = ['Size', 'Weight', 'Epic', 'Priority'];
+const fieldNames = ['Size', 'Epic', 'Priority'];
+const priorityPalette = [
+  { name: 'P1', color: 'RED' },
+  { name: 'P2', color: 'ORANGE' },
+  { name: 'P3', color: 'YELLOW' },
+];
+const epicPalette = [
+  { name: 'EXP', color: 'GREEN' },
+  { name: 'DASH', color: 'BLUE' },
+  { name: 'COMP', color: 'PURPLE' },
+  { name: 'HIST', color: 'YELLOW' },
+  { name: 'REC', color: 'PINK' },
+  { name: 'WATCH', color: 'ORANGE' },
+  { name: 'REL', color: 'GRAY' },
+  { name: 'BUG', color: 'RED' },
+  { name: 'DATABASE', color: 'GREEN' },
+  { name: 'DASHBOARD', color: 'BLUE' },
+];
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -31,6 +48,24 @@ export function validateBacklog(config) {
     'Nom de vue manquant.',
   );
   requireValue(
+    typeof config.project.epicViewName === 'string' &&
+      config.project.epicViewName.trim() &&
+      config.project.epicViewName !== config.project.viewName,
+    'Nom de vue Epic manquant ou identique a la vue Backlog.',
+  );
+  if (config.project.backlogColumns !== undefined)
+    requireValue(
+      Array.isArray(config.project.backlogColumns) &&
+        config.project.backlogColumns[0] === 'Title' &&
+        config.project.backlogColumns.every(
+          (name) =>
+            typeof name === 'string' && name.trim() === name && name.length > 0,
+        ) &&
+        new Set(config.project.backlogColumns).size ===
+          config.project.backlogColumns.length,
+      'backlogColumns doit contenir des noms de champs uniques et commencer par Title.',
+    );
+  requireValue(
     Array.isArray(config.project.stages) &&
       config.project.stages[0] === 'Backlog' &&
       config.project.stages.every(
@@ -42,9 +77,6 @@ export function validateBacklog(config) {
   requireValue(
     Array.isArray(config.sizes) &&
       config.sizes.map((size) => size.name).join(',') === 'XS,S,M,L,XL' &&
-      config.sizes.every(
-        (size) => Number.isInteger(size.weight) && size.weight > 0,
-      ) &&
       config.sizes.every((size) =>
         [
           'GRAY',
@@ -56,12 +88,8 @@ export function validateBacklog(config) {
           'PINK',
           'PURPLE',
         ].includes(size.color),
-      ) &&
-      config.sizes.every(
-        (size, index) =>
-          index === 0 || size.weight > config.sizes[index - 1].weight,
       ),
-    'Tailles attendues : XS,S,M,L,XL avec des poids entiers positifs croissants et des couleurs GitHub valides.',
+    'Tailles attendues : XS,S,M,L,XL avec des couleurs GitHub valides.',
   );
   requireValue(
     Array.isArray(config.epics) && config.epics.length > 0,
@@ -75,7 +103,8 @@ export function validateBacklog(config) {
         (view) =>
           typeof view.name === 'string' &&
           view.name.trim() &&
-          view.name !== config.project.viewName,
+          view.name !== config.project.viewName &&
+          view.name !== config.project.epicViewName,
       ) &&
       config.project.typeViews
         .map((view) => view.type)
@@ -161,6 +190,11 @@ export function validateBacklog(config) {
           `${ticket.id} : etapes de reproduction manquantes.`,
         );
       requireValue(
+        ticket.scope === undefined ||
+          ['backend', 'frontend'].includes(ticket.scope),
+        `${ticket.id} : scope doit etre backend ou frontend.`,
+      );
+      requireValue(
         config.sizes.some((size) => size.name === ticket.size),
         `${ticket.id} : taille inconnue.`,
       );
@@ -175,6 +209,14 @@ export function validateBacklog(config) {
             (criterion) => typeof criterion === 'string' && criterion.trim(),
           ),
         `${ticket.id} : criteres d'acceptation manquants.`,
+      );
+      requireValue(
+        Array.isArray(ticket.definitionOfDone) &&
+          ticket.definitionOfDone.length > 0 &&
+          ticket.definitionOfDone.every(
+            (criterion) => typeof criterion === 'string' && criterion.trim(),
+          ),
+        `${ticket.id} : Definition of Done manquante ou invalide.`,
       );
       requireValue(
         Array.isArray(ticket.dependsOn) &&
@@ -205,12 +247,13 @@ export function marker(id) {
 }
 
 export function issueBody(epic, ticket, config, issueUrls) {
-  const weight = config.sizes.find((size) => size.name === ticket.size).weight;
   const dependencies = ticket.dependsOn.length
     ? ticket.dependsOn.map((id) => `- ${issueUrls.get(id) ?? id}`).join('\n')
     : 'Aucune.';
   return [
     marker(ticket.key ?? ticket.id),
+    `## ${epic.title}`,
+    epic.objective,
     '## User story',
     ticket.story,
     ...(ticket.type === 'bug'
@@ -221,20 +264,15 @@ export function issueBody(epic, ticket, config, issueUrls) {
             .join('\n'),
         ]
       : []),
-    '## Objectif pédagogique',
-    `${epic.title} : ${epic.objective}`,
     '## Estimation initiale',
-    `**Taille : ${ticket.size}** | **Poids relatif : ${weight}** | **Priorité : ${ticket.priority}**`,
-    'Estimation indicative à discuter en refinement. Le poids ne représente ni des heures ni une note. Un ticket XL doit être découpé avant engagement en sprint.',
+    `**Taille : ${ticket.size}** | **Priorité : ${ticket.priority}**`,
+    'Estimation indicative à discuter en refinement. La taille ne représente ni des heures ni une note. Un ticket XL doit être découpé avant engagement en sprint.',
     "## Critères d'acceptation",
     ticket.acceptance.map((criterion) => `- [ ] ${criterion}`).join('\n'),
     '## Dépendances',
     dependencies,
     '## Definition of Done',
-    "- [ ] Critères d'acceptation vérifiés et démonstration préparée.",
-    '- [ ] Tests pertinents ajoutés ou adaptés et vérifications du projet réussies.',
-    '- [ ] Code relu et documentation utile mise à jour.',
-    '- [ ] Aucun secret ni donnée personnelle non nécessaire dans le dépôt.',
+    ticket.definitionOfDone.map((criterion) => `- [ ] ${criterion}`).join('\n'),
   ].join('\n\n');
 }
 
@@ -400,7 +438,13 @@ function ensureBacklogView(run, projectId, name, log) {
   log(`Vue ${name} configuree.`);
 }
 
-function ensureBacklogColumns(run, projectId, viewName, requiredIds) {
+function ensureBacklogColumns(
+  run,
+  projectId,
+  viewName,
+  requiredIds,
+  exact = false,
+) {
   const data = graphql(
     run,
     `
@@ -444,8 +488,9 @@ function ensureBacklogColumns(run, projectId, viewName, requiredIds) {
   const ids = view.configuration.visibleFields.nodes.map((field) => field.id);
   const remaining = ids.filter((id) => !requiredIds.slice(1).includes(id));
   const titleIndex = remaining.indexOf(requiredIds[0]);
-  const ordered =
-    titleIndex === -1
+  const ordered = exact
+    ? requiredIds
+    : titleIndex === -1
       ? [...requiredIds, ...remaining]
       : [
           ...remaining.slice(0, titleIndex + 1),
@@ -532,7 +577,13 @@ function extendSelectField(run, field, names, log) {
   );
 }
 
-function ensureSizeColors(run, fieldId, sizes) {
+function ensureSelectColors(
+  run,
+  fieldId,
+  palette,
+  fieldName,
+  preserveColors = false,
+) {
   const data = graphql(
     run,
     `
@@ -553,11 +604,13 @@ function ensureSizeColors(run, fieldId, sizes) {
   );
   requireValue(
     Array.isArray(data.node?.options),
-    'Impossible de lire les couleurs de Size.',
+    `Impossible de lire les couleurs de ${fieldName}.`,
   );
   const options = data.node.options.map((option) => {
-    const size = sizes.find((candidate) => candidate.name === option.name);
-    return size ? { ...option, color: size.color } : option;
+    const entry = palette.find((candidate) => candidate.name === option.name);
+    return entry && (!preserveColors || option.color === 'GRAY')
+      ? { ...option, color: entry.color }
+      : option;
   });
   if (
     options.every(
@@ -595,6 +648,8 @@ export function parseOptions(args) {
       apply: { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       'update-existing': { type: 'boolean', default: false },
+      'create-issues': { type: 'boolean', default: false },
+      prune: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
     },
   });
@@ -607,14 +662,24 @@ export function parseOptions(args) {
     typeof values.repo === 'string' && /^[A-Za-z0-9_.-]+$/.test(values.repo),
     '--repo NOM_DU_DEPOT est obligatoire (sans proprietaire).',
   );
-  requireValue(
-    typeof values.owner === 'string' && /^[A-Za-z0-9-]+$/.test(values.owner),
-    '--owner LOGIN est obligatoire (utilisateur ou organisation).',
-  );
-  values.repo = `${values.owner}/${values.repo}`;
+  if (values.owner !== undefined) {
+    requireValue(
+      /^[A-Za-z0-9-]+$/.test(values.owner),
+      '--owner doit etre un login utilisateur ou organisation valide.',
+    );
+    values.repo = `${values.owner}/${values.repo}`;
+  }
   requireValue(
     !values['project-number'] || /^[1-9]\d*$/.test(values['project-number']),
     '--project-number doit etre un entier positif.',
+  );
+  requireValue(
+    !values.prune || values['project-number'],
+    '--prune exige --project-number pour cibler un projet existant.',
+  );
+  requireValue(
+    !values.prune || values['create-issues'],
+    '--prune exige --create-issues : aucune issue modifiee en mode brouillons.',
   );
   return values;
 }
@@ -680,12 +745,324 @@ function readProjectItems(run, projectId) {
   return items;
 }
 
+function readRepositoryIssues(run, repo) {
+  return json(run, [
+    'api',
+    `repos/${repo}/issues?state=all&per_page=100`,
+    '--paginate',
+    '--slurp',
+  ])
+    .flat()
+    .filter((issue) => !issue.pull_request);
+}
+
+function pruneCandidates(config, issues, items) {
+  const keys = new Set(
+    config.epics.flatMap((epic) =>
+      epic.tickets.map((ticket) => ticket.key ?? ticket.id),
+    ),
+  );
+  return issues.filter((issue) => {
+    const markers = [
+      ...(issue.body ?? '').matchAll(
+        /<!-- tmdb-student-backlog:([A-Z][A-Z0-9-]*) -->/g,
+      ),
+    ];
+    return (
+      markers.length === 1 &&
+      !keys.has(markers[0][1]) &&
+      items.has(issue.html_url)
+    );
+  });
+}
+
+function pruneIssues(config, issues, items, projectId, run, log, apply) {
+  const candidates = pruneCandidates(config, issues, items);
+  for (const issue of candidates) {
+    log(`Prune : fermer et retirer du projet ${issue.html_url}`);
+    if (!apply) continue;
+    requireValue(
+      Number.isInteger(issue.number) && issue.number > 0,
+      'Numero d issue invalide pour --prune.',
+    );
+    const item = items.get(issue.html_url);
+    requireValue(
+      item.id,
+      'Identifiant de ticket du projet manquant pour --prune.',
+    );
+    if (issue.state !== 'closed')
+      run(
+        [
+          'api',
+          `repos/${config.repo}/issues/${issue.number}`,
+          '--method',
+          'PATCH',
+          '--input',
+          '-',
+        ],
+        JSON.stringify({ state: 'closed' }),
+      );
+    graphql(
+      run,
+      `
+        mutation ($project: ID!, $item: ID!) {
+          deleteProjectV2Item(input: { projectId: $project, itemId: $item }) {
+            deletedItemId
+          }
+        }
+      `,
+      { project: projectId, item: item.id },
+    );
+  }
+  log(
+    `Prune : ${candidates.length} ticket(s) ${apply ? 'retire(s)' : 'a retirer'}.`,
+  );
+}
+
+export function syncDependencies(run, projectId, itemId, fields, ticket) {
+  const field = fields.find((field) => field.name === 'dependsOn');
+  if (!field) return;
+  run([
+    'project',
+    'item-edit',
+    '--id',
+    itemId,
+    '--project-id',
+    projectId,
+    '--field-id',
+    field.id,
+    ...(ticket.dependsOn.length
+      ? ['--text', ticket.dependsOn.join(', ')]
+      : ['--clear']),
+  ]);
+}
+
+function instantiateDrafts(config, options, run, log, project) {
+  const items = [];
+  let cursor = null;
+  do {
+    const data = graphql(
+      run,
+      `
+        query ($id: ID!, $cursor: String) {
+          node(id: $id) {
+            ... on ProjectV2 {
+              items(first: 100, after: $cursor) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  id
+                  fullDatabaseId
+                  type
+                  content {
+                    ... on DraftIssue {
+                      id
+                      title
+                      body
+                    }
+                    ... on Issue {
+                      id
+                      title
+                      body
+                    }
+                  }
+                  fieldValues(first: 100) {
+                    pageInfo {
+                      hasNextPage
+                    }
+                    nodes {
+                      ... on ProjectV2ItemFieldSingleSelectValue {
+                        name
+                        field {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      { id: project.id, cursor },
+    );
+    requireValue(
+      data.node?.items,
+      'Impossible de lire les brouillons du projet.',
+    );
+    for (const item of data.node.items.nodes) {
+      requireValue(
+        !item.fieldValues.pageInfo.hasNextPage,
+        'Trop de champs sur un ticket du projet.',
+      );
+      items.push(item);
+    }
+    cursor = data.node.items.pageInfo.hasNextPage
+      ? data.node.items.pageInfo.endCursor
+      : null;
+  } while (cursor);
+  const tickets = config.epics.flatMap((epic) =>
+    epic.tickets.map((ticket) => ({ epic, ticket })),
+  );
+  const matched = new Map();
+  const urls = new Map();
+  for (const { ticket } of tickets) {
+    const matches = items.filter((item) => {
+      const markers = [
+        ...(item.content?.body ?? '').matchAll(
+          /<!-- tmdb-student-backlog:([A-Z][A-Z0-9-]*) -->/g,
+        ),
+      ];
+      return (
+        markers.length === 1 && markers[0][1] === (ticket.key ?? ticket.id)
+      );
+    });
+    requireValue(
+      matches.length <= 1,
+      `Plusieurs tickets correspondent a ${ticket.id}.`,
+    );
+    if (matches[0]) {
+      requireValue(
+        matches[0].type === 'DRAFT_ISSUE',
+        `${ticket.id} est une issue : convertir manuellement ou utiliser --create-issues.`,
+      );
+      matched.set(ticket.id, matches[0]);
+      urls.set(
+        ticket.id,
+        `${project.url}?pane=issue&itemId=${matches[0].fullDatabaseId}`,
+      );
+    }
+  }
+  const fields = json(run, [
+    'project',
+    'field-list',
+    String(project.number),
+    '--owner',
+    options.owner,
+    '--format',
+    'json',
+    '--limit',
+    '100',
+  ]).fields;
+  for (const { epic, ticket } of tickets) {
+    if (matched.has(ticket.id)) continue;
+    const result = graphql(
+      run,
+      `
+        mutation ($input: AddProjectV2DraftIssueInput!) {
+          addProjectV2DraftIssue(input: $input) {
+            projectItem {
+              id
+              fullDatabaseId
+              content {
+                ... on DraftIssue {
+                  id
+                  title
+                  body
+                }
+              }
+            }
+          }
+        }
+      `,
+      {
+        input: {
+          projectId: project.id,
+          title: `[${ticket.id}] ${ticket.title}`,
+          body: issueBody(epic, ticket, config, urls),
+        },
+      },
+    );
+    const item = result.addProjectV2DraftIssue?.projectItem;
+    requireValue(
+      item?.id && item.content?.id && item.fullDatabaseId,
+      `Creation du brouillon ${ticket.id} sans identifiant.`,
+    );
+    matched.set(ticket.id, {
+      ...item,
+      fieldValues: { nodes: [] },
+      created: true,
+    });
+    urls.set(
+      ticket.id,
+      `${project.url}?pane=issue&itemId=${item.fullDatabaseId}`,
+    );
+    log(`Brouillon cree : ${ticket.id}`);
+  }
+  for (const { epic, ticket } of tickets) {
+    const item = matched.get(ticket.id);
+    syncDependencies(run, project.id, item.id, fields, ticket);
+    if (item.created || options['update-existing']) {
+      const title = `[${ticket.id}] ${ticket.title}`;
+      const body = issueBody(epic, ticket, config, urls);
+      if (item.content.title !== title || item.content.body !== body)
+        graphql(
+          run,
+          `
+            mutation ($input: UpdateProjectV2DraftIssueInput!) {
+              updateProjectV2DraftIssue(input: $input) {
+                draftIssue {
+                  id
+                }
+              }
+            }
+          `,
+          { input: { draftIssueId: item.content.id, title, body } },
+        );
+    }
+    const populated = new Set(
+      item.fieldValues.nodes.map((value) => value.field?.name),
+    );
+    for (const [name, value] of Object.entries({
+      Status: 'Backlog',
+      Epic: epic.id,
+      Priority: ticket.priority,
+      Size: ticket.size,
+      ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
+    })) {
+      if (populated.has(name)) continue;
+      const field = fields.find((field) => field.name === name);
+      const option = field?.options?.find((option) => option.name === value);
+      requireValue(option, `Option ${value} absente de ${name}.`);
+      run([
+        'project',
+        'item-edit',
+        '--id',
+        item.id,
+        '--project-id',
+        project.id,
+        '--field-id',
+        field.id,
+        '--single-select-option-id',
+        option.id,
+      ]);
+    }
+  }
+  log(
+    `${tickets.length} tickets brouillons synchronises ; aucune issue creee.`,
+  );
+}
+
 export function instantiate(config, options, run = gh, log = console.log) {
   validateBacklog(config);
+  requireValue(
+    !options.prune || options['create-issues'],
+    '--prune exige --create-issues : aucune issue modifiee en mode brouillons.',
+  );
+  requireValue(
+    !options.prune || options['project-number'],
+    '--prune exige --project-number pour cibler un projet existant.',
+  );
   const allTickets = config.epics.flatMap((epic) => epic.tickets);
-  if (!options.apply) {
+  if (!options.apply && !options.prune) {
     log(
-      `Simulation : ${options.repo}, proprietaire ${options.owner}, ${allTickets.length} tickets. Aucune requete GitHub.`,
+      `Simulation : ${options.repo}${options.owner ? `, proprietaire ${options.owner}` : ''}, ${allTickets.length} tickets. Aucune requete GitHub.`,
     );
     if (options['update-existing']) {
       log(
@@ -704,6 +1081,39 @@ export function instantiate(config, options, run = gh, log = console.log) {
   }
 
   run(['auth', 'status']);
+  if (!options.owner) {
+    const user = json(run, ['api', 'user']);
+    requireValue(
+      typeof user.login === 'string' && /^[A-Za-z0-9-]+$/.test(user.login),
+      'Impossible de determiner le proprietaire : fournir --owner pour un depot d organisation.',
+    );
+    options.owner = user.login;
+    options.repo = `${options.owner}/${options.repo}`;
+  }
+  if (options.prune && !options.apply) {
+    const project = json(run, [
+      'project',
+      'view',
+      options['project-number'],
+      '--owner',
+      options.owner,
+      '--format',
+      'json',
+    ]);
+    requireValue(project.id && !project.closed, 'Projet absent ou ferme.');
+    const issues = readRepositoryIssues(run, options.repo);
+    const items = readProjectItems(run, project.id);
+    pruneIssues(
+      { ...config, repo: options.repo },
+      issues,
+      items,
+      project.id,
+      run,
+      log,
+      false,
+    );
+    return;
+  }
   const repository = json(run, [
     'repo',
     'view',
@@ -712,7 +1122,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
     'hasIssuesEnabled,viewerPermission',
   ]);
   requireValue(
-    repository.hasIssuesEnabled,
+    !options['create-issues'] || repository.hasIssuesEnabled,
     'Les issues doivent etre activees dans le depot cible.',
   );
   requireValue(
@@ -726,7 +1136,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
   );
   const personal = repositoryDetails.owner.type === 'User';
   const nativeTypes = new Map();
-  if (!personal) {
+  if (!personal && options['create-issues']) {
     const issueTypes = json(run, [
       'api',
       `orgs/${options.repo.split('/')[0]}/issue-types`,
@@ -744,19 +1154,13 @@ export function instantiate(config, options, run = gh, log = console.log) {
     }
   }
   log(
-    personal
-      ? 'Depot personnel : les types seront representes par des labels.'
-      : 'Depot d organisation : types natifs Feature et Bug.',
+    !options['create-issues']
+      ? 'Mode brouillons : aucune issue creee.'
+      : personal
+        ? 'Depot personnel : les types seront representes par des labels.'
+        : 'Depot d organisation : types natifs Feature et Bug.',
   );
-  const issuePages = json(run, [
-    'api',
-    `repos/${options.repo}/issues?state=all&per_page=100`,
-    '--paginate',
-    '--slurp',
-  ]);
-  const existingIssues = issuePages
-    .flat()
-    .filter((issue) => !issue.pull_request);
+  const existingIssues = readRepositoryIssues(run, options.repo);
   const issueUrls = new Map();
   const issuesById = new Map();
   for (const ticket of allTickets) {
@@ -774,7 +1178,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
   }
 
   const milestones = new Map();
-  if (config.milestones?.length) {
+  if (options['create-issues'] && config.milestones?.length) {
     const pages = json(run, [
       'api',
       `repos/${options.repo}/milestones?state=all&per_page=100`,
@@ -896,11 +1300,33 @@ export function instantiate(config, options, run = gh, log = console.log) {
       ?.options?.some((option) => option.name === 'Backlog'),
     'Ajouter manuellement l option Backlog au champ Status du projet existant, puis relancer.',
   );
+  if (config.project.backlogColumns?.includes('dependsOn')) {
+    const field = fields.find((candidate) => candidate.name === 'dependsOn');
+    if (!field)
+      run([
+        'project',
+        'field-create',
+        number,
+        ...projectArgs,
+        '--name',
+        'dependsOn',
+        '--data-type',
+        'TEXT',
+      ]);
+    else
+      requireValue(
+        field.type === 'ProjectV2Field' && !field.options,
+        'dependsOn doit etre un champ TEXT.',
+      );
+  }
   const specifications = [
     { name: 'Size', values: config.sizes.map((size) => size.name) },
-    { name: 'Weight' },
     { name: 'Epic', values: config.epics.map((epic) => epic.id) },
     { name: 'Priority', values: ['P1', 'P2', 'P3'] },
+    ...(allTickets.some((ticket) => ticket.scope !== undefined) ||
+    config.project.backlogColumns?.includes('scope')
+      ? [{ name: 'scope', values: ['backend', 'frontend'] }]
+      : []),
   ];
   for (const specification of specifications) {
     const field = fields.find(
@@ -915,31 +1341,12 @@ export function instantiate(config, options, run = gh, log = console.log) {
         '--name',
         specification.name,
         '--data-type',
-        specification.values ? 'SINGLE_SELECT' : 'NUMBER',
+        'SINGLE_SELECT',
       ];
-      if (specification.values)
-        args.push('--single-select-options', specification.values.join(','));
+      args.push('--single-select-options', specification.values.join(','));
       run(args);
-    } else if (specification.values) {
-      extendSelectField(run, field, specification.values, log);
     } else {
-      const data = graphql(
-        run,
-        `
-          query ($id: ID!) {
-            node(id: $id) {
-              ... on ProjectV2Field {
-                dataType
-              }
-            }
-          }
-        `,
-        { id: field.id },
-      );
-      requireValue(
-        data.node?.dataType === 'NUMBER',
-        'Le champ Weight doit etre de type NUMBER.',
-      );
+      extendSelectField(run, field, specification.values, log);
     }
   }
   fields = json(run, [
@@ -964,17 +1371,60 @@ export function instantiate(config, options, run = gh, log = console.log) {
     requireValue(field, `Champ ${name} absent.`);
     return field.id;
   });
-  ensureSizeColors(run, visibleFields[2], config.sizes);
-  ensureBacklogColumns(run, project.id, config.project.viewName, visibleFields);
-  ensureTypeViews(
+  ensureSelectColors(run, visibleFields[2], config.sizes, 'Size');
+  const priorityField = fields.find((field) => field.name === 'Priority');
+  requireValue(priorityField?.id, 'Champ Priority absent.');
+  ensureSelectColors(run, priorityField.id, priorityPalette, 'Priority');
+  ensureSelectColors(run, visibleFields[1], epicPalette, 'Epic', true);
+  const scopeField = fields.find((field) => field.name === 'scope');
+  requireValue(
+    !allTickets.some((ticket) => ticket.scope !== undefined) || scopeField?.id,
+    'Champ scope absent.',
+  );
+  if (allTickets.some((ticket) => ticket.scope !== undefined))
+    ensureSelectColors(
+      run,
+      scopeField.id,
+      [
+        { name: 'backend', color: 'BLUE' },
+        { name: 'frontend', color: 'PURPLE' },
+      ],
+      'scope',
+    );
+  ensureBacklogColumns(
     run,
     project.id,
-    config.project.typeViews,
-    personal,
-    nativeTypes,
-    visibleFields,
-    log,
+    config.project.viewName,
+    config.project.backlogColumns
+      ? config.project.backlogColumns.map((name) => {
+          const field = fields.find((candidate) => candidate.name === name);
+          requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
+          return field.id;
+        })
+      : allTickets.some((ticket) => ticket.scope !== undefined)
+        ? [...visibleFields, scopeField.id]
+        : visibleFields,
+    config.project.backlogColumns !== undefined,
   );
+  ensureBacklogView(run, project.id, config.project.epicViewName, log);
+  ensureBacklogColumns(run, project.id, config.project.epicViewName, [
+    visibleFields[0],
+    visibleFields[1],
+  ]);
+  if (options['create-issues'])
+    ensureTypeViews(
+      run,
+      project.id,
+      config.project.typeViews,
+      personal,
+      nativeTypes,
+      visibleFields,
+      log,
+    );
+  if (!options['create-issues']) {
+    instantiateDrafts(config, options, run, log, project);
+    return;
+  }
   const items = readProjectItems(run, project.id);
   if (personal) {
     const labels = json(run, [
@@ -1107,14 +1557,19 @@ export function instantiate(config, options, run = gh, log = console.log) {
         .filter((value) => value.field?.name)
         .map((value) => value.field.name),
     );
+    syncDependencies(run, project.id, item.id, fields, ticket);
     const values = {
       Status: 'Backlog',
       Size: ticket.size,
-      Weight: config.sizes.find((size) => size.name === ticket.size).weight,
       Epic: epic.id,
       Priority: ticket.priority,
+      ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
     };
-    for (const name of ['Status', ...fieldNames]) {
+    for (const name of [
+      'Status',
+      ...fieldNames,
+      ...(ticket.scope !== undefined ? ['scope'] : []),
+    ]) {
       if (populated.has(name)) continue;
       const field = fields.find((candidate) => candidate.name === name);
       requireValue(field, `Champ ${name} absent.`);
@@ -1128,15 +1583,11 @@ export function instantiate(config, options, run = gh, log = console.log) {
         '--field-id',
         field.id,
       ];
-      if (name === 'Weight') {
-        args.push('--number', String(values[name]));
-      } else {
-        const option = field.options?.find(
-          (candidate) => candidate.name === values[name],
-        );
-        requireValue(option, `Option ${values[name]} absente de ${name}.`);
-        args.push('--single-select-option-id', option.id);
-      }
+      const option = field.options?.find(
+        (candidate) => candidate.name === values[name],
+      );
+      requireValue(option, `Option ${values[name]} absente de ${name}.`);
+      args.push('--single-select-option-id', option.id);
       run(args);
     }
   }
@@ -1169,6 +1620,16 @@ export function instantiate(config, options, run = gh, log = console.log) {
       }
     }
   }
+  if (options.prune)
+    pruneIssues(
+      { ...config, repo: options.repo },
+      existingIssues,
+      items,
+      project.id,
+      run,
+      log,
+      true,
+    );
   log(
     `${allTickets.length} tickets presents dans le projet. ${updated} contenu(s) mis a jour. Les champs deja renseignes sont conserves.`,
   );
@@ -1178,7 +1639,10 @@ export function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
   if (options.help) {
     console.log(
-      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT --owner LOGIN [--config FILE] [--project-number N] [--update-existing] [--dry-run | --apply]\nSans --apply : simulation locale, sans requete GitHub.\nLe depot cible et le GitHub Project appartiennent au meme proprietaire, indique par --owner.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
+      '--apply utilise des brouillons par defaut. Ajouter --create-issues pour creer des issues ; --prune exige aussi --create-issues.',
+    );
+    console.log(
+      'Usage : npm run backlog:instantiate -- --repo NOM_DU_DEPOT [--owner LOGIN] [--config FILE] [--project-number N] [--update-existing] [--prune] [--dry-run | --apply]\nSans --apply : simulation locale, sauf --prune qui consulte GitHub sans ecriture.\nSans --owner, le login gh authentifie est utilise ; fournir --owner pour cibler une organisation.\n--prune exige --project-number : ferme les issues generees absentes du YAML et les retire uniquement du projet cible.\n--update-existing : remplace les titres et descriptions, y compris les modifications manuelles ; conserve les champs et commentaires.',
     );
     return;
   }

@@ -12,36 +12,37 @@ cliquez sur **Fork**. Une fois le fork créé dans votre compte ou votre
 organisation, ouvrez-le, puis choisissez **Code > Codespaces > Create codespace
 on [branche]**. Le Codespace s'ouvre directement sur votre fork.
 
-Dans le terminal du Codespace, vérifiez Node.js et installez les dépendances :
-
-```sh
-nvm install 24
-nvm use 24
-npm ci
-```
-
-Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Vérifiez également
-que le CLI GitHub est connecté :
+Le Codespace configure Node.js 24 et installe les dépendances à sa création.
+Dans le terminal, vérifiez que le CLI GitHub est connecté :
 
 ```sh
 gh auth status
 ```
 
-Le jeton doit permettre de créer des issues et un GitHub Project. Si votre
-authentification le permet, ajoutez l'accès aux Projects avec
+Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Si les dépendances
+changent après la création du Codespace, exécutez `npm ci`. Le jeton doit
+permettre de créer des issues et un GitHub Project. Si votre authentification
+le permet, ajoutez l'accès aux Projects avec
 `gh auth refresh -s project`. Les droits du Codespace et les règles de
 l'organisation cible peuvent limiter ces opérations.
 
 Le fork sert de copie du générateur : `--repo` désigne uniquement le nom du
-dépôt cible, et `--owner` son propriétaire. Les issues et le GitHub Project
-doivent appartenir au même propriétaire ; le fork du générateur n'est pas la
-cible, sauf si vous souhaitez réellement y créer le backlog. Remplacez
-`MON_LOGIN` et `MON_DEPOT`, puis lancez d'abord une simulation et l'import :
+dépôt cible. Sans `--owner`, le générateur utilise le login authentifié par
+`gh` comme propriétaire ; ajoutez `--owner ORGANISATION` pour une cible dans
+une organisation. Les issues et le GitHub Project doivent appartenir au même
+propriétaire ; le fork du générateur n'est pas la cible, sauf si vous souhaitez
+réellement y créer le backlog. Remplacez `MON_DEPOT`, puis lancez d'abord une
+simulation et l'import :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --dry-run
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --apply
 ```
+
+Par défaut, `--apply` synchronise des **brouillons GitHub Projects** sans créer
+d'issues. Leur identité repose sur les clés stables du YAML. La création
+d'issues doit être demandée explicitement avec `--create-issues --apply`.
+`--prune` nécessite aussi `--create-issues` ; il ne supprime pas les brouillons.
 
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué
 avant d'utiliser `--apply`, qui crée réellement les issues et le projet.
@@ -56,14 +57,16 @@ Cloner ce dépôt, puis exécuter les commandes depuis son répertoire :
 git clone https://github.com/but-sd/themoviedb-discovery-app-backlog-generator.git
 cd themoviedb-discovery-app-backlog-generator
 npm ci
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --dry-run
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --apply
 ```
 
 Node.js 24 ou supérieur et le CLI GitHub `gh` authentifié avec les droits sur
 les issues et Projects sont requis. Ne pas cibler ce dépôt de générateur pour
 instancier les tickets de l'application. `--repo` accepte uniquement le nom
-du dépôt ; `--owner` est le propriétaire commun du dépôt et du GitHub Project.
+du dépôt. Sans `--owner`, le login authentifié par `gh` est utilisé ; fournir
+`--owner ORGANISATION` pour une cible d'organisation. Le dépôt cible et le
+GitHub Project doivent appartenir au même propriétaire.
 
 ## Configuration et reprise
 
@@ -76,7 +79,7 @@ Les liens vers les PR de référence restent ceux de l'application.
 Pour reprendre le même projet, conserver son numéro :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_LOGIN --project-number NUMERO --apply
+npm run backlog:instantiate -- --repo MON_DEPOT --project-number NUMERO --apply
 ```
 
 Sans numéro, `--apply` crée un nouveau projet. Les relances ne dupliquent pas
@@ -84,7 +87,13 @@ les issues et conservent leur avancement. L'option `--update-existing` remplace
 explicitement leurs titres et descriptions, y compris les modifications
 manuelles, mais conserve les commentaires et champs déjà renseignés.
 `--config chemin/backlog.yaml` permet de fournir une autre configuration.
-La simulation est locale et n'effectue aucun appel GitHub.
+La simulation sans `--prune` est locale et n'effectue aucun appel GitHub.
+
+Pour nettoyer les issues générées retirées du YAML, utiliser `--prune` avec
+`--project-number NUMERO`. Avec `--dry-run`, cette option consulte GitHub sans
+écriture et affiche les issues concernées. Avec `--apply`, elle les ferme et
+les retire du projet ciblé, sans suppression définitive. Les issues manuelles
+et celles hors du projet sont conservées.
 
 L'extraction depuis l'application ne déplace ni ne supprime les issues et
 Projects existants. Pour mettre à jour le projet pédagogique de référence :

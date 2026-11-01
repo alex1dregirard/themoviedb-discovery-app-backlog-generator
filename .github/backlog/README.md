@@ -33,83 +33,112 @@ l'évolution historique des notes ou de la popularité : ces valeurs sont celles
 observées à la collecte. Une collecte plafonnée reste un échantillon, pas un
 recensement exhaustif.
 
-| Ticket  | Livraison attendue                                 | Taille | Prérequis        |
-| ------- | -------------------------------------------------- | ------ | ---------------- |
-| EXPL-01 | Spécification fournie des données et relations     | S      | Aucun            |
-| EXPL-02 | Mise en place du schéma SQLite spécifié            | M      | EXPL-01          |
-| EXPL-03 | Base locale et migrations                          | M      | EXPL-02          |
-| EXPL-04 | CLI d'initialisation et chemin configurable        | S      | EXPL-03          |
-| EXPL-05 | Import CSV et entretien des genres                 | M      | EXPL-04          |
-| EXPL-06 | Import CSV et entretien des pays de production     | M      | EXPL-05          |
-| EXPL-07 | Route Discover paginée par année                   | M      | EXPL-01          |
-| EXPL-08 | Extraction TMDB par année et pagination            | L      | EXPL-01, EXPL-07 |
-| EXPL-09 | Nettoyage et contrôles de qualité                  | M      | EXPL-01, EXPL-08 |
-| EXPL-10 | Chargement idempotent et suivi des exécutions      | L      | EXPL-03, EXPL-09 |
-| EXPL-11 | CLI de pilotage et simulation                      | M      | EXPL-04, EXPL-10 |
-| EXPL-12 | API de lecture et agrégations                      | L      | EXPL-10          |
-| EXPL-13 | Page, filtres et tableau paginé                    | M      | EXPL-12          |
-| EXPL-14 | Visualisations et interprétation                   | L      | EXPL-13          |
-| EXPL-15 | Démonstration reproductible et tests d'intégration | M      | EXPL-11, EXPL-14 |
+| Ticket       | Livraison attendue                                 | Taille | Prérequis                  |
+| ------------ | -------------------------------------------------- | ------ | -------------------------- |
+| DASHBOARD-01 | Spécification fournie des données et relations     | S      | Aucun                      |
+| DASHBOARD-02 | Mise en place du schéma SQLite spécifié            | M      | DASHBOARD-01               |
+| DASHBOARD-03 | Base locale et migrations                          | M      | DASHBOARD-02               |
+| DASHBOARD-04 | CLI d'initialisation et chemin configurable        | S      | DASHBOARD-03               |
+| DASHBOARD-05 | Import CSV et entretien des genres                 | M      | DASHBOARD-04               |
+| DASHBOARD-06 | Import CSV et entretien des pays de production     | M      | DASHBOARD-05               |
+| DASHBOARD-07 | Route Discover paginée par année                   | M      | DASHBOARD-01               |
+| DASHBOARD-08 | Extraction TMDB par année et pagination            | L      | DASHBOARD-01, DASHBOARD-07 |
+| DASHBOARD-09 | Nettoyage et contrôles de qualité                  | M      | DASHBOARD-01, DASHBOARD-08 |
+| DASHBOARD-10 | Chargement idempotent et suivi des exécutions      | L      | DASHBOARD-03, DASHBOARD-09 |
+| DASHBOARD-11 | CLI de pilotage et simulation                      | M      | DASHBOARD-04, DASHBOARD-10 |
+| DASHBOARD-12 | API de lecture et agrégations                      | L      | DASHBOARD-10               |
+| DASHBOARD-13 | Page, filtres et tableau paginé                    | M      | DASHBOARD-12               |
+| DASHBOARD-14 | Visualisations et interprétation                   | L      | DASHBOARD-13               |
+| DASHBOARD-15 | Démonstration reproductible et tests d'intégration | M      | DASHBOARD-11, DASHBOARD-14 |
 
-EXPL-04, EXPL-05 et EXPL-06 spécifient respectivement les apports des PR
+DASHBOARD-04, DASHBOARD-05 et DASHBOARD-06 spécifient respectivement les apports des PR
 [#50](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/50),
 [#51](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/51) et
 [#52](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/52).
 Ces PR contiennent aussi le socle des précédentes : les tickets distinguent
 leurs apports pour éviter de redemander les mêmes développements.
-EXPL-07 décrit la route Discover de la
+DASHBOARD-07 décrit la route Discover de la
 [#56](https://github.com/but-sd/themoviedb-discovery-app-demo-2/pull/56) :
 une seule page pour une année de sortie principale, sans collecte automatique,
 enrichissement par le détail ni stockage.
-Les anciens EXPL-04 à EXPL-11 deviennent EXPL-08 à EXPL-15 ; leurs clés stables
+Les anciens EXPL-04 à EXPL-11 correspondent à DASHBOARD-08 à DASHBOARD-15 ; leurs clés stables
 conservent leurs issues et leur suivi. Les nouveaux tickets ont des clés
 distinctes pour ne pas reprendre les anciennes issues portant ces numéros.
 Relancer avec `--update-existing --apply` pour actualiser les titres et les
 dépendances des issues déjà importées.
 
-EXPL-01 décrit le besoin d'exploration, le parcours Discover puis détail d'un film
+L'epic EXPL est renommée DASHBOARD. Les identifiants affichés et les dépendances
+utilisent DASHBOARD ; les clés stables `EXPL-*` restent inchangées pour retrouver
+les mêmes issues et conserver leur historique. Dans un projet existant, renommer
+l'option EXPL du champ Epic en DASHBOARD avant l'import conserve les rattachements.
+
+DASHBOARD-01 décrit le besoin d'exploration, le parcours Discover puis détail d'un film
 et un dictionnaire des données brutes avec leur provenance dans l'API TMDB.
 Les liens entre films, genres et pays sont expliqués par des règles métier et
 des exemples, sans fournir les entités ni le MCD. Les étudiants en déduisent
-eux-mêmes le MCD dans EXPL-02, puis le traduisent en schéma SQLite.
+eux-mêmes le MCD dans DASHBOARD-02, puis le traduisent en schéma SQLite.
 Le suivi détaillé des exécutions des étapes suivantes reste une extension distincte.
 
-Dans EXPL-01, l'année de sortie est une information dérivée de la date de sortie,
+Dans DASHBOARD-01, l'année de sortie est une information dérivée de la date de sortie,
 et non l'année demandée au collecteur. Une date absente ou inexploitable laisse
 l'année inconnue ; le film reste au catalogue mais ne participe pas aux
-regroupements par année. EXPL-02 choisit de traduire cette règle par une colonne
+regroupements par année. DASHBOARD-02 choisit de traduire cette règle par une colonne
 SQLite générée et stockée, avec les tests du calcul, de sa mise à jour automatique
 et de l'interdiction d'écrire directement cette colonne.
 
-EXPL-03 et EXPL-07 peuvent avancer en parallèle après leurs prérequis.
+DASHBOARD-03 et DASHBOARD-07 peuvent avancer en parallèle après leurs prérequis.
 Chaque ticket possède ses critères d'acceptation ; le
 champ Epic du projet associe les tickets à cette évolution, sans créer d'issue
 parent supplémentaire. Ce backlog décrit le travail futur, il n'implémente pas
 encore la base, le CLI ni le tableau de bord.
 
+Chaque ticket définit sa propre **Definition of Done** dans la liste obligatoire
+`definitionOfDone` du YAML. Elle décrit les vérifications et livrables nécessaires
+pour terminer ce ticket, distincts de ses critères d'acceptation. Le générateur
+la rend sous forme de cases à cocher, sans liste globale ni valeur par défaut.
+
+La propriété facultative `scope` indique la couche technique : `backend` ou
+`frontend`. Tous les tickets actuellement spécifiés, y compris DASHBOARD-10,
+déclarent `scope: backend`. À l'import, le générateur crée ou complète le champ
+GitHub **scope** avec ces deux options et le rend visible dans Backlog.
+Le générateur applique la palette **backend bleu**, **frontend violet**,
+en conservant les identifiants des options et leurs descriptions.
+Priority utilise **P1 rouge**, **P2 orange**, **P3 jaune**. Epic colore les
+options connues encore grises : EXP et DATABASE en vert, DASH et DASHBOARD en
+bleu, COMP en violet, HIST en jaune, REC en rose, WATCH en orange, BUG en rouge
+et REL en gris. Les couleurs Epic déjà personnalisées et les options inconnues
+sont conservées. GitHub propose huit couleurs pour dix epics : certaines
+couleurs sont donc partagées.
+Il initialise la valeur des tickets sans remplacer un périmètre déjà renseigné.
+Les configurations sans `scope` restent compatibles et n'imposent aucun
+périmètre. Cette propriété est distincte de `type: feature` ou `type: bug`,
+qui continue à déterminer le type natif GitHub ou le label correspondant.
+
 La configuration `project.typeViews` définit deux vues supplémentaires :
 **Features** et **Bugs**. Elles sont filtrées respectivement avec `type:Feature`
 et `type:Bug` en organisation, ou `label:feature` et `label:bug` sur un dépôt
-personnel. **Backlog** reste la vue globale. Les relances ne dupliquent pas ces vues ;
-leurs filtres sont synchronisés avec la configuration, et Title, Epic et Size
-sont visibles dans chacune.
+personnel. **Backlog** reste la vue globale ; **Epics** fournit une vue dédiée
+aux tickets associés à chaque epic. Les relances ne dupliquent pas ces vues ;
+les filtres de **Features** et **Bugs** sont synchronisés avec la configuration.
+Title, Epic et Size sont visibles dans Backlog, Features et Bugs ; Title et Epic
+sont visibles dans Epics.
 
 ### Estimer en tailles de T-shirt
 
-| Taille | Poids relatif initial | Repère pour la discussion                                        |
-| ------ | --------------------- | ---------------------------------------------------------------- |
-| XS     | 1                     | Changement très local, peu d'incertitude                         |
-| S      | 2                     | Petite fonctionnalité, périmètre clair                           |
-| M      | 3                     | Plusieurs composants ou transformations à coordonner             |
-| L      | 5                     | Fonctionnalité plus large, intégration ou incertitude importante |
-| XL     | 8                     | Trop large ou trop incertain : découper avant le sprint          |
+| Taille | Repère pour la discussion                                        |
+| ------ | ---------------------------------------------------------------- |
+| XS     | Changement très local, peu d'incertitude                         |
+| S      | Petite fonctionnalité, périmètre clair                           |
+| M      | Plusieurs composants ou transformations à coordonner             |
+| L      | Fonctionnalité plus large, intégration ou incertitude importante |
+| XL     | Trop large ou trop incertain : découper avant le sprint          |
 
 Ces tailles évaluent **l'effort relatif, la complexité et l'incertitude**, pas des
-heures. Les poids sont une convention pédagogique, pas une mesure universelle :
-ils ne servent ni à noter les étudiants ni à comparer les équipes. Les
+heures. Elles ne servent ni à noter les étudiants ni à comparer les équipes. Les
 estimations proposées sont un point de départ à **réestimer collectivement**.
-Après une réestimation dans GitHub, ajuster Size et Weight ensemble pour conserver
-la correspondance choisie par l'équipe.
+Après une réestimation dans GitHub, ajuster uniquement le champ Size.
+Le générateur ne crée ni ne renseigne de champ numérique Weight ; un ancien
+champ Weight peut être supprimé manuellement dans les paramètres du projet.
 
 La propriété `color` de chaque taille définit sa couleur GitHub : **XS vert,
 S bleu, M jaune, L orange, XL rouge**. Le générateur applique cette palette à
@@ -148,10 +177,12 @@ Avec un autre type de jeton, vérifier les droits correspondants ; les règles
 d'une organisation peuvent restreindre la création de projets. Ne jamais écrire
 un jeton dans la configuration.
 
-Depuis la racine de la copie du projet, remplacer `MON_LOGIN` et `MON_DEPOT`.
-Le dépôt cible et le GitHub Project doivent appartenir au même propriétaire :
-`--owner` indique ce propriétaire et `--repo` accepte uniquement le nom du
-dépôt, sans préfixe propriétaire.
+Depuis la racine de la copie du projet, remplacer `MON_DEPOT` et, pour une
+cible d'organisation, `MON_ORGANISATION`. Sans `--owner`, le générateur utilise
+le login authentifié par `gh`, ce qui convient à un dépôt personnel. Pour une
+organisation, fournir son nom avec `--owner`. Le dépôt cible et le GitHub
+Project doivent appartenir au même propriétaire ; `--repo` accepte uniquement
+le nom du dépôt, sans préfixe propriétaire.
 
 ```sh
 # Vérifier les tickets localement : aucune requête GitHub, aucune écriture.
@@ -162,7 +193,7 @@ npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --apply
 ```
 
 Le script crée un GitHub Project lié au dépôt, les issues et les champs :
-**Status**, **Size**, **Weight**, **Epic** et **Priority**. Tous les nouveaux
+**Status**, **Size**, **Epic** et **Priority**. Tous les nouveaux
 tickets sont initialisés dans **Backlog**. Le champ Status propose ensuite
 **Ready**, **In Progress**, **In Review** et **Done**. Les dépendances sont des
 liens dans les descriptions des issues, pas des blocages natifs GitHub.
@@ -178,12 +209,49 @@ mise en page. Si des vues personnalisées existent déjà, elles sont conservée
 une vue tabulaire Backlog est ajoutée si nécessaire. Les relances ne créent pas
 de vue en double. Les colonnes **Epic** et **Size** sont rendues visibles
 immédiatement après **Title**, dans cet ordre, sans retirer les autres colonnes
-ni modifier leur ordre relatif.
+ni modifier leur ordre relatif lorsque `project.backlogColumns` est absent.
+
+Par défaut, `--apply` crée ou réutilise des **brouillons du projet**, identifiés
+par leur marqueur stable, et ne crée aucune issue. `--update-existing` met aussi
+à jour leurs titres et descriptions ; les champs déjà renseignés restent
+préservés et les dépendances pointent vers les brouillons. Les milestones et
+types natifs Feature/Bug ne sont pas appliqués aux brouillons. Les vues filtrées
+Features/Bugs ne sont configurées qu'en mode issues.
+
+La création d'issues nécessite désormais **`--create-issues --apply`**.
+`--prune` nécessite également `--create-issues` et reste limité aux issues.
+Un ticket déjà présent comme issue n'est pas automatiquement dupliqué en
+brouillon : le script signale le conflit. Inversement, n'utilisez pas le mode
+issues pour importer un backlog déjà conservé en brouillons sans conversion
+préalable, afin de ne pas dupliquer les tickets.
+
+`project.backlogColumns` déclare la liste exacte des colonnes visibles et leur
+ordre. Le champ texte **dependsOn** affiche les identifiants de tickets du YAML,
+séparés par des virgules ; une liste vide laisse la cellule vide. Il est créé
+si cette colonne est configurée et synchronisé à chaque instanciation, pour les
+brouillons comme pour les issues. Il ne crée pas de relations natives GitHub.
+
+Cette liste définit les colonnes et leur
+ordre dans Backlog. La configuration actuelle affiche Title, Epic, Size, scope,
+Priority, Status, Linked pull requests et Sub-issues progress ; Assignees est
+masqué. Les noms sont ceux des champs GitHub, uniques, avec Title en premier.
+Une colonne inconnue provoque une erreur explicite. À chaque instanciation,
+le générateur applique cette liste, sans supprimer les champs ni leurs valeurs
+et sans changer les autres vues. Les configurations anciennes sans cette liste
+conservent le comportement additif précédent. Cette option décrit la visibilité
+enregistrée côté GitHub, pas une vérification visuelle du navigateur.
+
+La vue tabulaire **Epics**, nommée par `project.epicViewName`, affiche **Title**
+et **Epic**. Pour regrouper les tickets dans GitHub, choisir **Group by > Epic**
+dans le menu de la vue. Les lignes restent des tickets : le générateur ne crée
+pas d'issues parent pour représenter les epics. Le regroupement est une
+préférence de vue à sélectionner dans GitHub.
 
 Pour utiliser un tableau Kanban, choisir la disposition **Board** de la vue
 Backlog dans GitHub, la grouper par **Status**, puis afficher Size, Epic et
 Priority. Le script ne modifie pas les filtres ou regroupements ; il ajoute
-uniquement Epic et Size aux colonnes visibles si nécessaire.
+uniquement Epic et Size aux colonnes visibles si nécessaire. Dans la vue
+**Epics**, choisir **Group by > Epic** pour voir les tickets par epic.
 
 ### Reprendre un import ou utiliser un projet existant
 
@@ -238,7 +306,7 @@ même avec `--update-existing`. Omettre ou retirer cette propriété ne détache
 jamais un ticket de sa version. Les erreurs de permission arrêtent l'import.
 
 La configuration fournie crée **1.1.0** et y rattache les trois premiers tickets,
-**EXPL-01**, **EXPL-02** et **EXPL-03**. L'équipe peut ajuster le périmètre des
+**DASHBOARD-01**, **DASHBOARD-02** et **DASHBOARD-03**. L'équipe peut ajuster le périmètre des
 versions suivantes pendant la planification.
 Une milestone regroupe un objectif de livraison, tandis que le statut du projet
 décrit l'avancement des tickets.
@@ -267,11 +335,34 @@ identifiants, couleurs et descriptions des options existantes.
 
 Une nouvelle relance sans modification ne crée aucun doublon. Les tickets déjà
 en cours ou terminés, leurs contenus, leurs estimations et les options ajoutées
-par l'équipe restent intacts. Retirer une idée du fichier ne supprime rien dans
+par l'équipe restent intacts. Sans `--prune`, retirer une idée du fichier ne supprime rien dans
 GitHub. Modifier un ticket existant dans le fichier ne remplace pas son contenu
 sur GitHub : utiliser un nouvel identifiant pour un nouveau besoin, ou modifier
 l'issue manuellement pour préciser le besoin initial, ou utiliser la mise à jour
 explicite ci-dessous.
+
+### Nettoyer les tickets retirés du backlog
+
+`--prune` exige un `--project-number` explicite. Il ferme les issues générées
+absentes du YAML et les retire du projet ciblé, sans suppression définitive.
+Les issues manuelles, les pull requests, les issues hors de ce projet et celles
+dont la clé stable existe encore dans le YAML sont conservées. Une issue avec
+plusieurs marqueurs est conservée par précaution. Les autres projets ne sont
+pas modifiés, mais la fermeture de l'issue reste visible partout.
+
+```sh
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --prune --dry-run
+npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --project-number 7 --prune --apply
+```
+
+Contrairement à la simulation ordinaire, la simulation avec `--prune` consulte
+GitHub pour afficher les issues concernées, sans écriture. Avec `--apply`, le
+nettoyage intervient après l'import et les éventuelles mises à jour. Une erreur
+arrête le traitement ; les opérations déjà effectuées restent appliquées et
+une relance reprend le nettoyage. Les commentaires et l'historique des issues
+fermées sont conservés. Vérifier le résultat simulé et les clés stables avant
+application : modifier une clé peut faire considérer son ancienne issue comme
+obsolète.
 
 ### Mettre à jour le contenu des tickets existants
 
@@ -287,13 +378,13 @@ npm run backlog:instantiate -- --repo MON_DEPOT --owner MON_ORGANISATION --proje
 contenu diffère de la configuration**, y compris les modifications manuelles et
 les cases cochées dans la description. Prévenir les étudiants avant de l'utiliser.
 Les commentaires, affectations, labels, état ouvert/fermé et champs déjà
-renseignés du projet restent conservés, notamment l'avancement, Size et Weight.
+renseignés du projet restent conservés, notamment l'avancement et Size.
 Les estimations affichées dans la description restent les estimations initiales
 de la configuration, pas celles réévaluées dans les champs du projet.
 
 Les liens de dépendances sont reconstruits après création des nouveaux tickets.
 Les contenus identiques ne sont pas réécrits. Sans cette option, la relance reste
-strictement additive pour les titres et descriptions. La simulation ne consulte
+strictement additive pour les titres et descriptions. La simulation sans `--prune` ne consulte
 pas GitHub et ne détermine donc pas quelles issues ont changé.
 
 ## Proposition d'atelier agile
@@ -314,8 +405,8 @@ pas GitHub et ne détermine donc pas quelles issues ont changé.
 6. **Rétrospective** : comparer ce qui a été prévu et livré, discuter les
    incertitudes et ajuster le découpage et les estimations du sprint suivant.
 
-Pour une première itération, lire la spécification **EXPL-01**, puis réaliser le
-schéma **EXPL-02** et discuter le contrat d'extraction **EXPL-08**. Construire ensuite un petit
+Pour une première itération, lire la spécification **DASHBOARD-01**, puis réaliser le
+schéma **DASHBOARD-02** et discuter le contrat d'extraction **DASHBOARD-08**. Construire ensuite un petit
 incrément de bout en bout sur une période limitée avant d'élargir la collecte.
 Les tailles restent à réestimer ; découper les tickets L si nécessaire pour
 tenir l'objectif du sprint.
