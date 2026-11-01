@@ -13,10 +13,17 @@ organisation, ouvrez-le, puis choisissez **Code > Codespaces > Create codespace
 on [branche]**. Le Codespace s'ouvre directement sur votre fork.
 
 Le Codespace configure Node.js 24 et installe les dépendances à sa création.
-Dans le terminal, vérifiez que le CLI GitHub est connecté :
+Dans le terminal, passer les commandes suivante:
 
 ```sh
+# Vérifier le mode d’authentification
 gh auth status
+
+# Ne plus utiliser le jeton automatique du Codespace dans ce terminal
+unset GH_TOKEN GITHUB_TOKEN
+
+# S’authentifier avec ton compte et les droits Projects
+gh auth login --hostname github.com --web --scopes project
 ```
 
 Le projet requiert Node.js 24 ou supérieur (voir `.nvmrc`). Si les dépendances
@@ -35,8 +42,8 @@ réellement y créer le backlog. Remplacez `MON_DEPOT`, puis lancez d'abord une
 simulation et l'import :
 
 ```sh
-npm run backlog:instantiate -- --repo MON_DEPOT --dry-run
-npm run backlog:instantiate -- --repo MON_DEPOT --apply
+npm run backlog:instantiate -- --repo themoviedb-discovery-app --dry-run
+npm run backlog:instantiate -- --repo themoviedb-discovery-app --apply
 ```
 
 Par défaut, `--apply` synchronise des **brouillons GitHub Projects** sans créer
